@@ -5,7 +5,7 @@ from data import load, save, new_order, ensure_order_integrity
 import os
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
-if not TOKEN:
+if not DISCORD_TOKEN:
     raise RuntimeError("DISCORD_TOKEN mangler")
     
 BESTIL_CHANNEL_ID = 1458936290639876219
