@@ -3,7 +3,7 @@ from discord.ext import commands
 from discord import app_commands
 from data import load, save, new_order, ensure_order_integrity
 import os
-TOKEN = os.getenv("DISCORD_TOKEN")
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
 if not TOKEN:
     raise RuntimeError("DISCORD_TOKEN mangler")
