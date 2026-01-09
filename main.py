@@ -1,7 +1,5 @@
 import threading
 import os
-import discord
-from discord.ext import commands
 from flash import Flask, render_template, request, redirect, session, jsonify
 import json
 import time
@@ -234,53 +232,6 @@ def session_data(name):
     return jsonify({
         "hash": hashlib.md5(payload.encode()).hexdigest()
     })
-# =====================
-# DISCORD BOT
-# =====================
-
-intents = discord.Intents.default()
-intents.message_content = True
-
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-@bot.event
-async def on_ready():
-    print(f"✅ Bot logged in as {bot.user}")
-
-@bot.event
-async def on_message(message):
-    if message.author.bot:
-        return
-    if message.channel.id != BESTIL_CHANNEL_ID:
-        return
-
-    data = load()
-    session_name = data.get("current")
-
-    if not session_name:
-        await message.channel.send("❌ Ingen aktiv bestilling", delete_after=5)
-        return
-
-    orders = data["sessions"][session_name]["orders"]
-    user = str(message.author)
-
-    order = next((o for o in orders if o["user"] == user), None)
-    if not order:
-        order = {"user": user, "items": {}, "total": 0}
-        orders.append(order)
-
-    order["items"][message.content] = order["items"].get(message.content, 0) + 1
-    order["total"] = sum(order["items"].values())
-
-    save(data)
-    await message.delete()
-# =====================
-# start lortet
-# =====================
-def run_bot():
-    bot.run(DISCORD_TOKEN)
-    
-threading.Thread(target=run_bot, daemon=True).start()
 
 if __name__ == "__main__":
     app.run(debug=True)
