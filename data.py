@@ -1,15 +1,20 @@
-import json, os
-from datetime import datetime
+import json
+import os
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+BASE = os.path.dirname(__file__)
 
-def load(name):
-    with open(os.path.join(BASE, name), "r", encoding="utf-8") as f:
+def load(filename):
+    path = os.path.join(BASE, filename)
+    if not os.path.exists(path):
+        return {}
+
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def save(name, data):
-    with open(os.path.join(BASE, name), "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+def save(filename, data):
+    path = os.path.join(BASE, filename)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 def calc_total(items):
     prices = load("prices.json")
