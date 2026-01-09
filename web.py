@@ -147,4 +147,13 @@ def session_view(name):
         return "Findes ikke", 404
 
     orders = data["sessions"][name]["orders"]
-    total = sum(o.get("total", 0) for o in o
+
+    total = sum(o.get("total", 0) for o in orders)
+
+    return render_template(
+        "session.html",
+        name=name,
+        orders=orders,
+        total=total,
+        is_admin=is_admin()
+    )
