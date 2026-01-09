@@ -31,7 +31,7 @@ def load():
         with open(SESSIONN_FILE, "r") as f:
             return json.load(f)
             
-deef save(data):
+def save(data):
     with open(SESSION_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
