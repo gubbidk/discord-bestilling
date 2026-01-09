@@ -17,7 +17,6 @@ DISCORD_WEBHOOK = "INDSÆT_DIN_WEBHOOK_URL_HER"
 SESSIONS_FILE = "sessions.json"
 PRICES = load("prices.json")
 
-app = Flask(__name__)
 app.secret_key = "super-secret-key"
 
 
