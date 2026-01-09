@@ -1,43 +1,55 @@
-import threading
 import os
-from flask import Flask, render_template, request, redirect, session, jsonify
 import json
-import time
-
+import hashlib
+import requests
+from flask import Flask, render_template, request, redirect, session, jsonify
 
 # =====================
 # KONFIG
 # =====================
-DISCORD_TOKEN = os.getenv("discord")
-BESTIL_CHANNEL_ID = int(os.getenv("BESTIL_CHANNEL_ID", "0"))
 SESSIONS_FILE = "sessions.json"
+ADMIN_KEY = "thomas"
+DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK", "")
 
-ADMIN_KEY = "thomas"  
-DISCORD_WEBHOOK = ""
-
+PRICES = json.load(open("prices.json", "r", encoding="utf-8"))
 
 # =====================
 # FLASK
 # =====================
 app = Flask(__name__)
-app.secret_key  = "fedko"
+app.secret_key = os.getenv("SECRET_KEY", "super-secret-key")
 
-def load():
-    if not os.path.exists(SESSION_FILE):
-        with open(SESSION_FILE, "w") as f:
-            json.dump({"current": None, "sessions": {}}, f)
-        with open(SESSIONN_FILE, "r") as f:
-            return json.load(f)
-            
-def save(data):
-    with open(SESSION_FILE, "w") as f:
+# =====================
+# FIL-HJÆLPERE
+# =====================
+def load_sessions():
+    if not os.path.exists(SESSIONS_FILE):
+        data = {"current": None, "sessions": {}}
+        save_sessions(data)
+        return data
+
+    with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_sessions(data):
+    with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
-# =====================
-# HJÆLPERE
-# =====================
+
+def normalize(data):
+    data.setdefault("sessions", {})
+    for name, val in data["sessions"].items():
+        if isinstance(val, list):
+            data["sessions"][name] = {"open": False, "orders": val}
+        else:
+            val.setdefault("open", False)
+            val.setdefault("orders", [])
+    return data
+
+
 def is_admin():
-    return flask_session.get("admin", False)
+    return session.get("admin", False)
 
 
 def send_discord(msg):
@@ -45,37 +57,20 @@ def send_discord(msg):
         requests.post(DISCORD_WEBHOOK, json={"content": msg})
 
 
-def normalize(data):
-    """
-    Sikrer format:
-    sessions[name] = { open: bool, orders: [...] }
-    """
-    if "sessions" not in data:
-        data["sessions"] = {}
-
-    for name, val in data["sessions"].items():
-        if isinstance(val, list):
-            data["sessions"][name] = {
-                "open": False,
-                "orders": val
-            }
-        else:
-            data["sessions"][name].setdefault("open", False)
-            data["sessions"][name].setdefault("orders", [])
-
-    return data
+def calc_total(items):
+    return sum(PRICES.get(i, 0) * a for i, a in items.items())
 
 # =====================
 # ROUTES
 # =====================
 @app.route("/")
 def index():
-    data = normalize(load(SESSIONS_FILE))
+    data = normalize(load_sessions())
     return render_template(
         "index.html",
         sessions=list(data["sessions"].keys()),
         current=data.get("current"),
-        is_admin=session.get("admin", False)
+        is_admin=is_admin()
     )
 
 
@@ -84,7 +79,7 @@ def admin_login():
     if request.args.get("key") != ADMIN_KEY:
         return "❌ Forkert admin-nøgle", 403
 
-    flask_session["admin"] = True
+    session["admin"] = True
     return redirect("/")
 
 
@@ -93,7 +88,7 @@ def open_session():
     if not is_admin():
         return "Forbidden", 403
 
-    data = normalize(load(SESSIONS_FILE))
+    data = normalize(load_sessions())
 
     if data.get("current"):
         data["sessions"][data["current"]]["open"] = False
@@ -106,7 +101,7 @@ def open_session():
     data["sessions"][name] = {"open": True, "orders": []}
     data["current"] = name
 
-    save(SESSIONS_FILE, data)
+    save_sessions(data)
     send_discord(f"🟢 **{name} åbnet**")
 
     return redirect("/")
@@ -117,12 +112,12 @@ def close_session():
     if not is_admin():
         return "Forbidden", 403
 
-    data = normalize(load(SESSIONS_FILE))
+    data = normalize(load_sessions())
     if data.get("current"):
         send_discord(f"🔴 **{data['current']} lukket**")
         data["sessions"][data["current"]]["open"] = False
         data["current"] = None
-        save(SESSIONS_FILE, data)
+        save_sessions(data)
 
     return redirect("/")
 
@@ -132,13 +127,13 @@ def delete_session(name):
     if not is_admin():
         return "Forbidden", 403
 
-    data = normalize(load(SESSIONS_FILE))
+    data = normalize(load_sessions())
 
     if name in data["sessions"]:
         del data["sessions"][name]
         if data.get("current") == name:
             data["current"] = None
-        save(SESSIONS_FILE, data)
+        save_sessions(data)
         send_discord(f"🗑️ **{name} slettet**")
 
     return redirect("/")
@@ -146,92 +141,10 @@ def delete_session(name):
 
 @app.route("/session/<name>")
 def session_view(name):
-    data = normalize(load(SESSIONS_FILE))
+    data = normalize(load_sessions())
 
     if name not in data["sessions"]:
         return "Findes ikke", 404
 
     orders = data["sessions"][name]["orders"]
-    total = sum(o.get("total", 0) for o in orders)
-
-    return render_template(
-        "session.html",
-        name=name,
-        orders=orders,
-        total=total,
-        admin=is_admin()
-    )
-
-
-@app.route("/edit_order/<name>/<order_id>", methods=["GET", "POST"])
-def edit_order(name, order_id):
-    if not is_admin():
-        return "Forbidden", 403
-
-    data = normalize(load(SESSIONS_FILE))
-    orders = data["sessions"][name]["orders"]
-    order = next((o for o in orders if o["id"] == order_id), None)
-
-    if not order:
-        return "Ordre findes ikke", 404
-
-    if request.method == "POST":
-        for item in order["items"]:
-            order["items"][item] = int(request.form.get(item, 0))
-        order["total"] = calc_total(order["items"])
-
-        save(SESSIONS_FILE, data)
-        send_discord(
-            f"✏️ **Ordre opdateret** ({order['user']})\n"
-            f"💰 Ny total: {order['total']:,} kr"
-        )
-        return redirect(f"/session/{name}")
-
-    return render_template(
-        "edit_order.html",
-        order=order,
-        session=name,
-        prices=PRICES,
-        admin=True
-    )
-
-
-@app.route("/delete_order/<name>/<order_id>")
-def delete_order(name, order_id):
-    if not is_admin():
-        return "Forbidden", 403
-
-    data = normalize(load(SESSIONS_FILE))
-    orders = data["sessions"][name]["orders"]
-
-    order = next((o for o in orders if o["id"] == order_id), None)
-    data["sessions"][name]["orders"] = [
-        o for o in orders if o["id"] != order_id
-    ]
-
-    save(SESSIONS_FILE, data)
-
-    if order:
-        items = "\n".join(
-            f"- {k}: {v}"
-            for k, v in order["items"].items() if v > 0
-        )
-        send_discord(
-            f"🗑️ **Ordre slettet** ({order['user']})\n{items}"
-        )
-
-    return redirect(f"/session/{name}")
-
-
-@app.route("/session_data/<name>")
-def session_data(name):
-    data = normalize(load(SESSIONS_FILE))
-    orders = data["sessions"].get(name, {}).get("orders", [])
-
-    payload = json.dumps(orders, sort_keys=True)
-    return jsonify({
-        "hash": hashlib.md5(payload.encode()).hexdigest()
-    })
-
-if __name__ == "__main__":
-    app.run(debug=True)
+    total = sum(o.get("total", 0) for o in o
