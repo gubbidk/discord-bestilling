@@ -11,12 +11,12 @@ from data import load, save, calc_total
 # =====================
 # KONFIG
 # =====================
-ADMIN_KEY = "thomas"  # skift hvis du vil
-DISCORD_WEBHOOK = "INDSÆT_DIN_WEBHOOK_URL_HER"
+ADMIN_KEY = "thomas"  
+DISCORD_WEBHOOK = ""
 
 SESSIONS_FILE = "sessions.json"
 PRICES = load("prices.json")
-
+app = Flask(__name__)
 app.secret_key = "super-secret-key"
 
 
@@ -222,4 +222,5 @@ def session_data(name):
     })
 
 
-app = Flask(__name__)
+if __name__ == "__main__":
+    app.run(debug=True)
