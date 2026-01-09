@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>📋 Bestillinger</h2>
+
+<div class="grid">
+{% for s in sessions %}
+    <div class="card">
+        <h3>{{ s }}</h3>
+
+        <div class="actions">
+            <a class="btn" href="/session/{{ s }}">Åbn</a>
+
+            {% if is_admin %}
+            <a class="btn danger" href="/delete_session/{{ s }}">Slet</a>
+            {% endif %}
+        </div>
+    </div>
+{% endfor %}
+</div>
+
+<hr>
+
+{% if is_admin %}
+<div class="actions">
+    <a class="btn success" href="/open_session">➕ Ny bestilling</a>
+    <a class="btn warning" href="/close_session">🔒 Luk aktiv bestilling</a>
+</div>
+{% endif %}
+
+<script>
+setInterval(() => {
+    location.reload();
+}, 4000);
+</script>
+
+{% endblock %}

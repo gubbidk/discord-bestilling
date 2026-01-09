@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="page-title">✏️ Rediger ordre</h2>
+
+{% if not is_admin %}
+<div class="card order-edit">
+    <p style="text-align:center; font-size:1.1rem;">
+        🔒 <strong>Kun administratorer</strong> kan redigere ordrer.
+    </p>
+
+    <div class="form-actions" style="justify-content:center;">
+        <a class="btn" href="/session/{{ session }}">
+            ⬅ Tilbage
+        </a>
+    </div>
+</div>
+
+{% else %}
+
+<div class="card order-edit">
+
+    <div class="order-header">
+        <div>
+            <h3>{{ order.user }}</h3>
+            <span class="badge">ID {{ order.id }}</span>
+        </div>
+        <div class="order-total">
+            <span>Total</span>
+            <strong id="live-total">{{ order.total }} kr</strong>
+        </div>
+    </div>
+
+    <form method="post" class="edit-form">
+
+        <table class="edit-table">
+            <tr>
+                <th>Item</th>
+                <th>Antal</th>
+            </tr>
+
+            {% for item, amount in order["items"].items() %}
+            <tr>
+                <td>{{ item }}</td>
+                <td>
+                    <input
+                        type="number"
+                        name="{{ item }}"
+                        value="{{ amount }}"
+                        min="0"
+                        class="number-input"
+                        data-price="{{ prices[item] }}"
+                    >
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        <div class="form-actions">
+            <button class="btn success" type="submit">
+                💾 Gem ændringer
+            </button>
+
+            <a class="btn" href="/session/{{ session }}">
+                ⬅ Tilbage
+            </a>
+        </div>
+
+    </form>
+</div>
+
+<script>
+function updateTotal() {
+    let total = 0;
+
+    document.querySelectorAll(".number-input").forEach(input => {
+        const amount = parseInt(input.value) || 0;
+        const price = parseInt(input.dataset.price) || 0;
+        total += amount * price;
+    });
+
+    document.getElementById("live-total").innerText =
+        total.toLocaleString("da-DK") + " kr";
+}
+
+document.querySelectorAll(".number-input").forEach(input => {
+    input.addEventListener("input", updateTotal);
+});
+</script>
+
+{% endif %}
+
+{% endblock %}

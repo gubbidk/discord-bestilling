@@ -1,0 +1,9 @@
+{
+    "current": "bestilling1",
+    "sessions": {
+        "bestilling1": {
+            "open": true,
+            "orders": []
+        }
+    }
+}

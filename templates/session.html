@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>📦 {{ name }}</h2>
+
+<div class="summary">
+    <div class="summary-card">
+        <span>Total pris</span>
+        <strong>{{ total }} kr</strong>
+    </div>
+</div>
+
+{% if orders|length == 0 %}
+<p class="muted">Ingen ordrer endnu</p>
+{% endif %}
+
+{% for o in orders %}
+<div class="card order">
+
+    <div class="order-header">
+        <h3>{{ o.user }}</h3>
+        <span class="badge">ID {{ o.id }}</span>
+    </div>
+
+    <table>
+        <tr>
+            <th>Item</th>
+            <th>Antal</th>
+        </tr>
+
+        {% for item, amount in o["items"].items() %}
+        {% if amount > 0 %}
+        <tr>
+            <td>{{ item }}</td>
+            <td>{{ amount }}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+    </table>
+
+    <div class="order-footer">
+        <strong>{{ o.total }} kr</strong>
+
+        {% if session.admin %}
+        <div class="actions">
+            <a class="btn small" href="/edit_order/{{ name }}/{{ o.id }}">
+                Rediger
+            </a>
+            <a class="btn small danger" href="/delete_order/{{ name }}/{{ o.id }}">
+                Slet
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endfor %}
+
+<script>
+let lastHash = null;
+
+async function checkUpdates() {
+    const res = await fetch("/session_data/{{ name }}");
+    const data = await res.json();
+
+    if (lastHash === null) {
+        lastHash = data.hash;
+        return;
+    }
+
+    if (data.hash !== lastHash) {
+        location.reload();
+    }
+}
+
+setInterval(checkUpdates, 3000);
+</script>
+
+{% endblock %}
