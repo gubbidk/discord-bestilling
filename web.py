@@ -10,7 +10,7 @@ import time
 # =====================
 DISCORD_TOKEN = os.getenv("discord")
 BESTIL_CHANNEL_ID = int(os.getenv("BESTIL_CHANNEL_ID", "0"))
-SESSION_FILE = "sessions.json"
+SESSIONS_FILE = "sessions.json"
 
 ADMIN_KEY = "thomas"  
 DISCORD_WEBHOOK = ""
