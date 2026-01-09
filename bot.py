@@ -2,8 +2,12 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from data import load, save, new_order, ensure_order_integrity
+import os
+TOKEN = os.getenv("DISCORD_TOKEN")
 
-TOKEN = "MTQ1ODkzNDI1NTk4NjkzMzc2MQ.GAYGVa.q86yY9bB2PObfF0BdQi3yFqgBjW-ioH_cXd1WE"
+if not TOKEN:
+    raise RuntimeError("DISCORD_TOKEN mangler")
+    
 BESTIL_CHANNEL_ID = 1458936290639876219
 
 intents = discord.Intents.default()
