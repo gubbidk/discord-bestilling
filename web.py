@@ -1,24 +1,39 @@
-from flask import (
-    Flask, render_template, request,
-    redirect, session as flask_session, jsonify
-)
+import threading
 import os
+import discord
+from discord.ext import commands
+from flash import Flask, render_template, request, redirect, session, jsonify
 import json
-import hashlib
-import requests
-from data import load, save, calc_total
+import time
+
 
 # =====================
 # KONFIG
 # =====================
+DISCORD_TOKEN = os.getenv("discord")
+BESTIL_CHANNEL_ID = int(os.getenv("BESTIL_CHANNEL_ID", "0"))
+SESSION_FILE = "sessions.json"
+
 ADMIN_KEY = "thomas"  
 DISCORD_WEBHOOK = ""
 
-SESSIONS_FILE = "sessions.json"
-PRICES = load("prices.json")
-app = Flask(__name__)
-app.secret_key = "super-secret-key"
 
+# =====================
+# FLASK
+# =====================
+app = Flask(__name__)
+app.secret_key  = "fedko"
+
+def load():
+    if not os.path.exists(SESSION_FILE):
+        with open(SESSION_FILE, "w") as f:
+            json.dump({"current": None, "sessions": {}}, f)
+        with open(SESSIONN_FILE, "r") as f:
+            return json.load(f)
+            
+deef save(data):
+    with open(SESSION_FILE, "w") as f:
+        json.dump(data, f, indent=2)
 
 # =====================
 # HJÆLPERE
@@ -63,7 +78,7 @@ def index():
         "index.html",
         sessions=list(data["sessions"].keys()),
         current=data.get("current"),
-        admin=is_admin()
+        is_admin=session.get("admin", False)
     )
 
 
