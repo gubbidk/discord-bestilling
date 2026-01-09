@@ -2,33 +2,27 @@ import json
 import os
 from datetime import datetime
 
-BASE = os.path.dirname(__file__)
+SESSIONS_FILE = "sessions.json"
 
-def load(filename):
-    path = os.path.join(BASE, filename)
-    if not os.path.exists(path):
-        return {}
-
-    with open(path, "r", encoding="utf-8") as f:
+def load_sessions():
+    if not os.path.exists(SESSIONS_FILE):
+        with open(SESSIONS_FILE, "w") as f:
+            json.dump({"current": None, "sessions": {}}, f)
+    with open(SESSIONS_FILE, "r") as f:
         return json.load(f)
 
-def save(filename, data):
-    path = os.path.join(BASE, filename)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
-
-def calc_total(items):
-    prices = load("prices.json")
-    return sum(prices.get(i, 0) * a for i, a in items.items())
+def save_sessions(data):
+    with open(SESSIONS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
 
 def new_order(user, items):
     return {
         "id": str(datetime.now().timestamp()),
         "user": user,
         "items": items,
-        "total": calc_total(items),
+        "total": 0,
         "time": datetime.now().strftime("%d-%m-%Y %H:%M")
     }
 
-def ensure_order_integrity(order):
-    order["total"] = calc_total(order["items"])
+def calc_total(items, prices):
+    return sum(items[i] * prices.get(i, 0) for i in items)
