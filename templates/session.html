@@ -21,9 +21,12 @@
             <h1>📦 {{ name }}</h1>
             <div class="muted">
                 Logget ind som <strong>{{ user.name }}</strong>
-                {% if admin %} ADMIN {% endif %}
+                {% if admin %}<span class="badge admin">ADMIN</span>{% endif %}
             </div>
-            <a href="/" class="btn blue">← Oversigt</a>
+
+            <div class="actions">
+                <a href="/" class="btn blue">← Oversigt</a>
+            </div>
         </div>
     </div>
 </header>
@@ -32,7 +35,7 @@
 
 <!-- BESTILLINGER -->
 <section class="card">
-    <h2>🧾 Bestillinger</h2>
+    <h2>🧾 Ordrer</h2>
 
     {% if orders %}
     <table class="table">
@@ -47,25 +50,36 @@
             </tr>
         </thead>
         <tbody>
+
         {% set grand_total = 0 %}
+
         {% for o in orders %}
-            {% set grand_total = grand_total + o.total %}
+            {% set grand_total = grand_total + (o.total or 0) %}
             <tr>
                 <td>{{ o.user }}</td>
+
                 <td>
+                    <ul class="item-list">
                     {% for item, amount in o["items"].items() %}
                         {% if amount > 0 %}
-                            {{ item }} x{{ amount }}<br>
+                            <li>{{ item }} × {{ amount }}</li>
                         {% endif %}
                     {% endfor %}
+                    </ul>
                 </td>
-                <td>{{ "{:,}".format(o.total) }} kr</td>
+
+                <td>{{ "{:,}".format(o.total or 0) }} kr</td>
 
                 {% if admin %}
-                <td>
-                    <a href="/edit_order/{{ name }}/{{ o.id }}">✏️</a>
-                    <a href="/delete_order/{{ name }}/{{ o.id }}"
-                       onclick="return confirm('Slet ordre?')">❌</a>
+                <td class="admin-actions">
+                    <a class="icon-btn"
+                       href="/edit_order/{{ name }}/{{ o.id }}"
+                       title="Rediger ordre">✏️</a>
+
+                    <a class="icon-btn danger"
+                       href="/delete_order/{{ name }}/{{ o.id }}"
+                       onclick="return confirm('Vil du slette denne ordre?')"
+                       title="Slet ordre">❌</a>
                 </td>
                 {% endif %}
             </tr>
@@ -74,11 +88,12 @@
     </table>
 
     <div class="total-line">
-        <strong>Samlet total:</strong> {{ "{:,}".format(grand_total) }} kr
+        <strong>Samlet total:</strong>
+        {{ "{:,}".format(grand_total) }} kr
     </div>
 
     {% else %}
-        <p class="muted">Samlet total 0 kr</p>
+        <p class="muted">Ingen ordrer endnu – samlet total 0 kr</p>
     {% endif %}
 </section>
 
@@ -96,6 +111,7 @@
 
 </main>
 
+<!-- REAL-TIME UPDATE -->
 <script>
 let lastHash = null;
 
@@ -116,7 +132,6 @@ async function pollSession() {
 
 setInterval(pollSession, 2000);
 </script>
-
 
 </body>
 </html>

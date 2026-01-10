@@ -4,24 +4,40 @@
 <h2>📋 Bestillinger</h2>
 
 <div class="grid">
-{% for s in sessions %}
+{% for name, session in sessions.items() %}
     <div class="card">
-        <h3>{{ s }}</h3>
+
+        <h3>
+            {{ name }}
+            {% if not session.open %}
+                <span title="Bestilling lukket">🔒</span>
+            {% endif %}
+        </h3>
+
+        <p>
+            💰 <strong>Total:</strong>
+            {{ totals.get(name, 0) }} kr
+        </p>
 
         <div class="actions">
-            <a class="btn" href="/session/{{ s }}">Åbn</a>
+            <a class="btn" href="/session/{{ name }}">Åbn</a>
 
-            {% if is_admin %}
-            <a class="btn danger" href="/delete_session/{{ s }}">Slet</a>
+            {% if admin %}
+                <a class="btn danger"
+                   href="/delete_session/{{ name }}"
+                   onclick="return confirm('Vil du slette hele bestillingen?')">
+                   ❌
+                </a>
             {% endif %}
         </div>
+
     </div>
 {% endfor %}
 </div>
 
 <hr>
 
-{% if is_admin %}
+{% if admin %}
 <div class="actions">
     <a class="btn success" href="/open_session">➕ Ny bestilling</a>
     <a class="btn warning" href="/close_session">🔒 Luk aktiv bestilling</a>
@@ -29,6 +45,7 @@
 {% endif %}
 
 <script>
+/* Simpel real-time refresh (bevarer nuværende løsning) */
 setInterval(() => {
     location.reload();
 }, 4000);
