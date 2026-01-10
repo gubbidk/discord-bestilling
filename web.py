@@ -39,6 +39,27 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # =====================
 # HJÆLPERE
 # =====================
+
+def get_session_lager_status(session_name):
+    data = normalize(load_session())
+    session = data["sessions"].get(session_name, {})
+    orders = session.get("orders", [])
+
+    lager = load_lager()
+    used = {}
+    for o in orders:
+        for item, amount in o.get("items", {}).items():
+            used[item] = used.get(item, 0) + amount
+
+    status = {}
+    for item, max_mount in lager.items():
+        status[item] = {
+                "used": used.get(item, 0),
+                "left": max(0, max_amount - used.get(item, 0)),
+                "max": max_amount
+        }
+    return status
+
 def load_json(path, default):
     if not os.path.exists(path):
         return default
@@ -428,6 +449,67 @@ def audit():
 
     return render_template("audit.html", events=events)
 
+@app.route("/edit_order/<session_name>/<order_id>", methods=["GET", "POST"])
+def edit_order(session_name, order_id):
+    if not is_admin():
+        return "Forbidden", 403
+
+    data = normalize(load_sessions())
+    session_data = data["sessions"].get(session_name)
+    if not session_data:
+        return "Session not found", 404
+    orders = session_data.get("orders", [])
+    order = next((o for in orders if o["id"] == order_id), None)
+    if not order:
+        return "Order not found", 404
+    
+    prices = load_prices()
+    lager = load_lager()
+
+    # ======= POST (GEM) =======
+    if request.method == "POST":
+        before_items = order["items"].copy()
+        used = {}
+        for o in orders:
+            for item, amounnt in o.get("items", {}).items():
+                used [item] = used.get(item, 0) + amount
+    total = 0
+    for item in order["items"]:
+        req = int(request.form.get(item, 0))
+        used_by_others = used.get(item, 0) - before_items.get(item, 0)
+        max_allowed = max(0, lager.get(item, 0) - used_by_others)
+        final = min(req, max_allowed)
+        order["items"][item] = final
+        total += final * prices.get(item, 0)
+    order["total"] = total
+    save_sessions(data)
+
+    changes = []
+    for k in order["items"]:
+        if before_items.get(k, 0) != order["items"].get(k, 0):
+            changes.append(
+                f"{k}: {before_items.get(k, 0)}  →  {order['items'].get(k, 0)}"
+
+            )
+    audit_log(
+        "edit_order",
+        session["user"]["name"],
+        f"{session_name}:{order_id}\n"
+        + ("Ændringer:\n. " + "\n- ".join(changes) if changes else "Ingen ændrinnger")
+
+    )
+
+    return redirect(f"/session/{session_name}")
+
+# ========= GET (vis formular) ======
+return render_template(
+    "edit_order.html",
+    session=session_name,
+    order=order,
+    prices=prices,
+    admin=True,
+    user=session["user"]
+)
 # =====================
 # START
 # =====================

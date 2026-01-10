@@ -51,16 +51,13 @@
         </thead>
         <tbody>
 
-        {% set grand_total = 0 %}
-
         {% for o in orders %}
-            {% set grand_total = grand_total + (o.total or 0) %}
             <tr>
                 <td>{{ o.user }}</td>
 
                 <td>
                     <ul class="item-list">
-                    {% for item, amount in o["items"].items() %}
+                    {% for item, amount in o.items.items() %}
                         {% if amount > 0 %}
                             <li>{{ item }} × {{ amount }}</li>
                         {% endif %}
@@ -89,7 +86,7 @@
 
     <div class="total-line">
         <strong>Samlet total:</strong>
-        {{ "{:,}".format(grand_total) }} kr
+        {{ "{:,}".format(total or 0) }} kr
     </div>
 
     {% else %}
@@ -97,7 +94,7 @@
     {% endif %}
 </section>
 
-<!-- 📦 LAGERSTATUS (NY FEATURE) -->
+<!-- 📦 LAGERSTATUS -->
 <section class="card">
     <h2>📦 Lagerstatus</h2>
 
