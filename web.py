@@ -101,7 +101,7 @@ def is_blocked(discord_id):
 def enforce_blocked_users():
     if "user" not in session:
         return
-    uid= sessionn["user"].get("id")
+    uid= session["user"].get("id")
     if not uid:
         return
     if is_blocked(uid):
