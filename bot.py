@@ -124,7 +124,7 @@ async def on_message(message: discord.Message):
         lines = ["📦 **Lagerstatus (tilbage)**"]
         for item, amount in remaining.items():
             status = "⚠️" if amount <= 5 else "✅"
-            lines.append(f"• **{item}**: {max_amount}")
+            lines.append(f"{status} **{item}**: {amount}")
 
         await message.channel.send("\n".join(lines), delete_after=5)
         try:
@@ -132,6 +132,7 @@ async def on_message(message: discord.Message):
         except discord.NotFound:
             pass
         return
+
 
 
     # =====================
