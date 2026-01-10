@@ -137,9 +137,15 @@ def get_active_session_orders():
         return []
     return data["sessions"].get(current, {}).get("orders", [])
 
-def get_lager_status():
+def get_lager_status_for_session(session_name):
+    data = normalize(load_sessions())
+    session_data = data["sessions"].get(session_name)
+
+    if not session_data:
+        return {}
+
+    orders = session_data.get("orders", [])
     lager = load_lager()
-    orders = get_active_session_orders()
 
     used = {item: 0 for item in lager}
 
@@ -167,6 +173,7 @@ def get_lager_status():
         }
 
     return status
+
 
 
     # brugt lager KUN for denne session
@@ -365,11 +372,7 @@ def view_session(name):
         return "Findes ikke", 404
 
     orders = data["sessions"][name]["orders"]
-
-    # 🔥 KUN aktiv session påvirker lager
-    active_orders = get_active_session_orders()
-    lager_status = get_lager_status()
-
+    lager_status = get_lager_status_for_session(name)
     total = sum(o.get("total", 0) for o in orders)
 
     return render_template(
@@ -381,6 +384,7 @@ def view_session(name):
         admin=is_admin(),
         user=session["user"]
     )
+
 
 
 @app.route("/open_session")
