@@ -358,6 +358,32 @@ def audit():
         return "Forbidden", 403
     return render_template("audit.html", events=reversed(load_audit()["events"]))
 
+@app.route("/close_session")
+def close_session():
+    if not is_admin():
+        return "Forbidden", 403
+
+    data = normalize(load_sessions())
+
+    if not data.get("current"):
+        return redirect("/")
+
+    name = data["current"]
+
+    data["sessions"][name]["open"] = False
+    data["current"] = None
+
+    save_sessions(data)
+
+    audit_log(
+        "close_session",
+        session["user"]["name"],
+        name
+    )
+
+    return redirect("/")
+
+
 # =====================
 # START
 # =====================
