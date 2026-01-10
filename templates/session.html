@@ -53,7 +53,7 @@
             <tr>
                 <td>{{ o.user }}</td>
                 <td>
-                    {% for item, amount in o.items.items() %}
+                    {% for item, amount in o["items"].items() %}
                         {% if amount > 0 %}
                             {{ item }} x{{ amount }}<br>
                         {% endif %}
