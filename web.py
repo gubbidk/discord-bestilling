@@ -2,6 +2,8 @@ import os
 import json
 import hashlib
 from flask import Flask, render_template, request, redirect, session, jsonify
+import requests
+from urllib.parse import urlencode
 
 # =====================
 # KONFIGURATION
@@ -9,6 +11,13 @@ from flask import Flask, render_template, request, redirect, session, jsonify
 SESSIONS_FILE = "sessions.json"
 ADMIN_KEY = os.getenv("ADMIN_KEY", "thomas")
 DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK", "")
+DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
+DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
+DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID")
+DISCORD_ADMIN_ROLE = os.getenv("DISCORD_ADMIN_ROLE")
+
+ACCESS_FILE = "access.json"
+OAUTH_REDIRECT = "/auth/callback"
 
 # =====================
 # FLASK SETUP
@@ -49,15 +58,43 @@ def normalize(data):
 
     return data
 
+def load_access():
+    if not os.path.exists(ACCESS_FILE):
+        return {"blocked": []}
+    with open(ACCESS_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_access(data):
+    with open(ACCESS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+def is_blocked(discord_id):
+    return discord_id in load_access().get("blocked", [])
+
 
 def is_admin():
     return session.get("admin", False)
+
+@app.route("/login")
+def login():
+    params = {
+        "client_id": DISCORD_CLIENT_ID,
+        "redirect_uri": request.url_root.strip("/") + OAUTH_REDIRECT,
+        "response_type": "code",
+        "scope": "identify guilds.members.read"
+    }
+
+    return redirect(
+        "https://discord.com/api/oauth2/authorize?" + urlencode(params)
+    )
 
 # =====================
 # ROUTES
 # =====================
 @app.route("/")
 def index():
+    if "user" not in session:
+    return redirect("/login")
     data = normalize(load_sessions())
     return render_template(
         "index.html",
@@ -65,6 +102,68 @@ def index():
         current=data["current"],
         admin=is_admin()
     )
+
+@app.route("/auth/callback")
+def auth_callback():
+    code = request.args.get("code")
+    if not code:
+        return "No code", 400
+
+    token_res = requests.post(
+        "https://discord.com/api/oauth2/token",
+        data={
+            "client_id": DISCORD_CLIENT_ID,
+            "client_secret": DISCORD_CLIENT_SECRET,
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": request.url_root.strip("/") + OAUTH_REDIRECT
+        },
+        headers={"Content-Type": "application/x-www-form-urlencoded"}
+    ).json()
+
+    token = token_res.get("access_token")
+    if not token:
+        return "OAuth failed", 403
+
+    headers = {"Authorization": f"Bearer {token}"}
+
+    user = requests.get(
+        "https://discord.com/api/users/@me",
+        headers=headers
+    ).json()
+
+    member = requests.get(
+        f"https://discord.com/api/users/@me/guilds/{DISCORD_GUILD_ID}/member",
+        headers=headers
+    )
+
+    if member.status_code != 200:
+        return "Ikke medlem af serveren", 403
+
+    if is_blocked(user["id"]):
+        return "Du er blokeret fra web-panelet", 403
+
+    roles = member.json().get("roles", [])
+
+    is_admin = False
+    guild_roles = requests.get(
+        f"https://discord.com/api/guilds/{DISCORD_GUILD_ID}/roles",
+        headers={"Authorization": f"Bot {os.getenv('DISCORD_TOKEN')}"}
+    ).json()
+
+    role_map = {r["id"]: r["name"] for r in guild_roles}
+
+    for r in roles:
+        if role_map.get(r) == DISCORD_ADMIN_ROLE:
+            is_admin = True
+
+    session["user"] = {
+        "id": user["id"],
+        "name": user["username"]
+    }
+    session["admin"] = is_admin
+
+    return redirect("/")
 
 
 @app.route("/admin")
@@ -206,6 +305,17 @@ def session_data(name):
         "hash": hashlib.md5(payload.encode()).hexdigest()
     })
 
+@app.route("/admin/block/<discord_id>")
+def block_user(discord_id):
+    if not session.get("admin"):
+        return "Du er bannet fra web-panelet", 403
+
+    data = load_access()
+    if discord_id not in data["blocked"]:
+        data["blocked"].append(discord_id)
+        save_access(data)
+
+    return redirect("/")
 
 # =====================
 # START

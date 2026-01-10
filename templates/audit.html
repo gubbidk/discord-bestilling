@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>📜 Audit log</h2>
+
+{% for e in events %}
+<div class="card">
+    <strong>{{ e.time }}</strong><br>
+    {{ e.admin }} → {{ e.action }} → {{ e.target }}
+</div>
+{% endfor %}
+
+{% endblock %}

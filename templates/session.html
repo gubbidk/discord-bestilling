@@ -15,12 +15,16 @@
 {% endif %}
 
 {% for o in orders %}
-<div class="card order">
+<div style="display:flex;align-items:center;gap:10px;">
+    {% if o.discord_id %}
+    <img
+        src="https://cdn.discordapp.com/avatars/{{ o.discord_id }}/{{ o.avatar }}.png"
+        onerror="this.style.display='none'"
+        style="width:32px;height:32px;border-radius:50%;">
+    {% endif %}
 
-    <div class="order-header">
-        <h3>{{ o.user }}</h3>
-        <span class="badge">ID {{ o.id }}</span>
-    </div>
+    <h3>{{ o.user }}</h3>
+</div>
 
     <table>
         <tr>
@@ -43,15 +47,34 @@
 
         {% if session.admin %}
         <div class="actions">
-            <a class="btn small" href="/edit_order/{{ name }}/{{ o.id }}">
-                Rediger
-            </a>
-            <a class="btn small danger" href="/delete_order/{{ name }}/{{ o.id }}">
-                Slet
-            </a>
-        </div>
-        {% endif %}
-    </div>
+{% if session.admin %}
+
+<a class="btn small" href="/edit_order/{{ name }}/{{ o.id }}">
+    ✏️ Rediger
+</a>
+
+<a class="btn small danger" href="/delete_order/{{ name }}/{{ o.id }}">
+    🗑️ Slet
+</a>
+
+{% if o.discord_id %}
+<a class="btn small warning"
+   href="/admin/block/{{ o.discord_id }}"
+   onclick="return confirm('Blokér bruger fra web?')">
+   🚫 Blokér
+</a>
+
+<a class="btn small success"
+   href="/admin/unblock/{{ o.discord_id }}"
+   onclick="return confirm('Fjern blokering?')">
+   🔓 Fjern blok
+</a>
+{% endif %}
+
+{% endif %}
+</div>
+
+
 
 </div>
 {% endfor %}
