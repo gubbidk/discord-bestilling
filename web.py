@@ -101,7 +101,35 @@ def get_active_session_orders():
 
 def get_lager_status(session_orders):
     lager = load_lager()
-    used = {}
+
+    # brugt lager KUN for denne session
+    used = {item: 0 for item in lager}
+
+    for o in session_orders:
+        for item, amount in o.get("items", {}).items():
+            if item in used:
+                used[item] += amount
+
+    status = {}
+    for item, max_amount in lager.items():
+        left = max_amount - used.get(item, 0)
+        pct = 0 if max_amount == 0 else left / max_amount
+
+        if left <= 0:
+            level = "danger"
+        elif pct < 0.3:
+            level = "warning"
+        else:
+            level = "ok"
+
+        status[item] = {
+            "left": left,
+            "max": max_amount,
+            "level": level
+        }
+
+    return status
+
 
     for o in session_orders:
         for item, amount in o.get("items", {}).items():
