@@ -204,3 +204,31 @@ th, td {
 .admin-bar .btn {
     margin-right: 10px;
 }
+
+.lager-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+}
+
+.lager-item {
+    padding: 10px;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.lager-item.ok {
+    background: #e6fffa;
+    border: 2px solid #2ecc71;
+}
+
+.lager-item.warning {
+    background: #fff8e1;
+    border: 2px solid #f1c40f;
+}
+
+.lager-item.danger {
+    background: #ffecec;
+    border: 2px solid #e74c3c;
+}

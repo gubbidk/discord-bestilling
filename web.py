@@ -35,6 +35,36 @@ app.secret_key = os.getenv("FLASK_SECRET", "dev-secret")
 # =====================
 # HJÆLPERE
 # =====================
+
+def get_lager_status(session_orders):
+    lager = load_lager()
+    used = {}
+
+    for o in session_orders:
+        for item, amount in o.get("items", {}).items():
+            used[item] = used.get(item, 0) + amount
+
+    status = {}
+    for item, max_amount in lager.items():
+        left = max_amount - used.get(item, 0)
+        pct = 0 if max_amount == 0 else left / max_amount
+
+        if left <= 0:
+            level = "danger"
+        elif pct < 0.3:
+            level = "warning"
+        else:
+            level = "ok"
+
+        status[item] = {
+            "left": left,
+            "max": max_amount,
+            "level": level
+        }
+
+    return status
+
+
 def load_json(path, default):
     if not os.path.exists(path):
         return default
@@ -196,11 +226,44 @@ def index():
 
 @app.route("/session/<name>")
 def view_session(name):
+    if "user" not in session:
+        return redirect("/login")
+
     data = normalize(load_sessions())
+
     if name not in data["sessions"]:
         return "Findes ikke", 404
 
     orders = data["sessions"][name]["orders"]
+
+    # ===== LAGERSTATUS (NY) =====
+    lager = load_lager()
+
+    # brugt pr vare
+    used = {}
+    for o in orders:
+        for item, amount in o.get("items", {}).items():
+            used[item] = used.get(item, 0) + amount
+
+    lager_status = {}
+    for item, max_amount in lager.items():
+        u = used.get(item, 0)
+        left = max(0, max_amount - u)
+
+        if left <= 0:
+            level = "danger"
+        elif left <= max_amount * 0.25:
+            level = "warn"
+        else:
+            level = "ok"
+
+        lager_status[item] = {
+            "max": max_amount,
+            "used": u,
+            "left": left,
+            "level": level
+        }
+
     total = sum(o.get("total", 0) for o in orders)
 
     return render_template(
@@ -208,9 +271,11 @@ def view_session(name):
         name=name,
         orders=orders,
         total=total,
+        lager_status=lager_status,   # ✅ VIGTIG
         admin=is_admin(),
         user=session["user"]
     )
+
 
 @app.route("/edit_order/<session_name>/<order_id>", methods=["GET", "POST"])
 def edit_order(session_name, order_id):
@@ -347,6 +412,29 @@ def session_data(name):
     orders = data["sessions"].get(name, {}).get("orders", [])
     payload = json.dumps(orders, sort_keys=True)
     return jsonify({"hash": hashlib.md5(payload.encode()).hexdigest()})
+
+@app.route("/admin/users")
+def admin_users():
+    if not is_admin():
+        return "Forbidden", 403
+
+    data = normalize(load_sessions())
+    access = load_access()
+    users = {}
+
+    for s in data["sessions"].values():
+        for o in s.get("orders", []):
+            uid = o.get("user_id")
+            if uid:
+                users[uid] = o.get("user")
+
+    return render_template(
+        "admin_users.html",
+        users=users,
+        blocked=access.get("blocked", []),
+        user=session["user"],
+        admin=True
+    )
 
 # =====================
 # START
