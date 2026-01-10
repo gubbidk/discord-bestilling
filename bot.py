@@ -123,12 +123,13 @@ async def on_message(message: discord.Message):
     order = next((o for o in orders if o["user"] == user), None)
     if not order:
         order = {
-            "id": str(datetime.now().timestamp()),
-            "user": user,
-            "items": {k: 0 for k in prices},
+            "id": str(time.time()),
+            "user": str(message.author),
+            "discord_id": str(message.author.id),  # ✅ VIGTIG
+            "items": {k: 0 for k in PRICES},
             "total": 0,
             "time": datetime.now().strftime("%d-%m-%Y %H:%M")
-        }
+}
         orders.append(order)
 
     # parsing: "2 veste" / "veste"
