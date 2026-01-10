@@ -339,13 +339,25 @@ def admin_users():
 
     access = load_access()
 
+    # Sortér: admins først, derefter users, derefter navn
+    users = dict(
+        sorted(
+            access.get("users", {}).items(),
+            key=lambda x: (
+                0 if x[1].get("role") == "admin" else 1,
+                x[1].get("name", "").lower()
+            )
+        )
+    )
+
     return render_template(
         "admin_users.html",
-        users=access.get("users", {}),
+        users=users,
         blocked=access.get("blocked", []),
         user=session["user"],
         admin=True
     )
+
 
 @app.route("/admin/block/<discord_id>")
 def block_user(discord_id):
