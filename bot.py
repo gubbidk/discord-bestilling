@@ -33,6 +33,8 @@ PRICES_FILE   = f"{DATA_DIR}/prices.json"
 # =====================
 def load_json(path, default):
     if not os.path.exists(path):
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(default, f)
         return default
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -46,6 +48,7 @@ def load_sessions():
 
 def save_sessions(data):
     save_json(SESSIONS_FILE, data)
+
 
 def load_lager():
     return load_json(LAGER_FILE, {})
@@ -150,7 +153,7 @@ async def on_message(message: discord.Message):
         amount = int(parts[0])
         item = parts[1]
 
-    if item not in prices:
+    if item not in prices or prices.get(item, 0) <= 0:
         await message.channel.send(
             f"❌ Ukendt vare: `{item}`",
             delete_after=6
