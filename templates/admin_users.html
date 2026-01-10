@@ -3,14 +3,22 @@
 
 <h2>👥 Brugere</h2>
 
+{% if users %}
 <div class="grid">
-{% for uid, info in users.items() %}
+{% for uid, info in users|dictsort(attribute='1.role', reverse=True) %}
     <div class="card">
 
         <h3>
             {{ info.name }}
+
+            {% if info.role == "admin" %}
+                <span title="Admin">🛡️</span>
+            {% else %}
+                <span title="Bruger">👤</span>
+            {% endif %}
+
             {% if uid in blocked %}
-                <span title="Blokeret">⛔</span>
+                <span title="Blokeret">⛔ Blokeret</span>
             {% endif %}
         </h3>
 
@@ -50,6 +58,9 @@
     </div>
 {% endfor %}
 </div>
+{% else %}
+<p>Ingen brugere har logget ind endnu.</p>
+{% endif %}
 
 <hr>
 

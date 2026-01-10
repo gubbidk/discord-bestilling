@@ -3,6 +3,7 @@
 
 <h2>📋 Bestillinger</h2>
 
+{% if sessions %}
 <div class="grid">
 {% for name, session in sessions.items() %}
     <div class="card">
@@ -34,6 +35,9 @@
     </div>
 {% endfor %}
 </div>
+{% else %}
+<p>Der er ingen bestillinger endnu.</p>
+{% endif %}
 
 <hr>
 
@@ -42,6 +46,7 @@
     <a class="btn success" href="/open_session">➕ Ny bestilling</a>
     <a class="btn warning" href="/close_session">🔒 Luk aktiv bestilling</a>
     <a class="btn blue" href="/admin/users">👥 Brugere</a>
+    <a class="btn" href="/admin/audit">📜 Audit</a>
 </div>
 {% endif %}
 

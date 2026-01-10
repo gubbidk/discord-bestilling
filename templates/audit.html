@@ -3,12 +3,43 @@
 
 <h2>📜 Audit log</h2>
 
+<form method="get" style="margin-bottom: 1rem;">
+    <select name="action" onchange="this.form.submit()">
+        <option value="">Alle handlinger</option>
+        <option value="open_session">Open session</option>
+        <option value="close_session">Close session</option>
+        <option value="delete_session">Delete session</option>
+        <option value="edit_order">Edit order</option>
+        <option value="delete_order">Delete order</option>
+        <option value="block">Block</option>
+        <option value="unblock">Unblock</option>
+    </select>
+</form>
+
+{% if events %}
 {% for e in events %}
 <div class="card">
     <strong>{{ e.time }}</strong><br>
-    {{ e.admin }} → {{ e.action }} →
-    <pre style="margin:4px 0 0 0; white-space:pre-wrap;">{{ e.target }}</pre>
+
+    <span>
+        <strong>{{ e.admin }}</strong>
+        →
+        <strong>{{ e.action }}</strong>
+    </span>
+
+    <pre style="margin:6px 0 0 0; white-space:pre-wrap;">
+{{ e.target }}
+    </pre>
 </div>
 {% endfor %}
+{% else %}
+<p>Der er ingen audit-events endnu.</p>
+{% endif %}
+
+<hr>
+
+<div class="actions">
+    <a class="btn" href="/">⬅️ Tilbage</a>
+</div>
 
 {% endblock %}

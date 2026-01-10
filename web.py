@@ -5,6 +5,7 @@ import requests
 from datetime import datetime
 from urllib.parse import urlencode
 from flask import Flask, render_template, request, redirect, session, jsonify
+from flask_socketio import SocketIO
 
 # =====================
 # KONFIGURATION
@@ -33,6 +34,8 @@ OAUTH_REDIRECT = "/auth/callback"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "dev-secret")
 
+socketio = SocketIO(app, cors_allowed_origins="*")
+
 # =====================
 # HJÆLPERE
 # =====================
@@ -51,6 +54,7 @@ def load_sessions():
 
 def save_sessions(data):
     save_json(SESSIONS_FILE, data)
+    socketio.emit("update")
 
 def normalize(data):
     data.setdefault("current", None)
@@ -199,7 +203,6 @@ def auth_callback():
     if not access_ok:
         return "Ingen adgang", 403
 
-    # Flask session
     session["user"] = {
         "id": user["id"],
         "name": user["username"],
@@ -207,7 +210,6 @@ def auth_callback():
     }
     session["admin"] = admin
 
-    # Gem kendt bruger
     access = load_access()
     uid = user["id"]
 
@@ -294,6 +296,24 @@ def open_session():
 
     return redirect("/")
 
+@app.route("/close_session")
+def close_session():
+    if not is_admin():
+        return "Forbidden", 403
+
+    data = normalize(load_sessions())
+    if not data.get("current"):
+        return redirect("/")
+
+    name = data["current"]
+    data["sessions"][name]["open"] = False
+    data["current"] = None
+
+    save_sessions(data)
+    audit_log("close_session", session["user"]["name"], name)
+
+    return redirect("/")
+
 @app.route("/delete_session/<name>")
 def delete_session(name):
     if not is_admin():
@@ -337,6 +357,9 @@ def block_user(discord_id):
         save_access(access)
         audit_log("block", session["user"]["name"], discord_id)
 
+    if session.get("user", {}).get("id") == discord_id:
+        session.clear()
+
     return redirect("/admin/users")
 
 @app.route("/admin/unblock/<discord_id>")
@@ -356,36 +379,16 @@ def unblock_user(discord_id):
 def audit():
     if not is_admin():
         return "Forbidden", 403
-    return render_template("audit.html", events=reversed(load_audit()["events"]))
 
-@app.route("/close_session")
-def close_session():
-    if not is_admin():
-        return "Forbidden", 403
+    events = list(reversed(load_audit()["events"]))
+    action = request.args.get("action")
+    if action:
+        events = [e for e in events if e["action"] == action]
 
-    data = normalize(load_sessions())
-
-    if not data.get("current"):
-        return redirect("/")
-
-    name = data["current"]
-
-    data["sessions"][name]["open"] = False
-    data["current"] = None
-
-    save_sessions(data)
-
-    audit_log(
-        "close_session",
-        session["user"]["name"],
-        name
-    )
-
-    return redirect("/")
-
+    return render_template("audit.html", events=events)
 
 # =====================
 # START
 # =====================
 if __name__ == "__main__":
-    app.run(debug=True)
+    socketio.run(app, debug=True)
