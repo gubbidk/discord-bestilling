@@ -3,39 +3,50 @@
 
 <h2>📜 Brugerhistorik</h2>
 
-<form method="get" class="card" style="margin-bottom:1rem;">
-    <label><strong>Discord ID</strong></label><br>
-    <input type="text" name="uid" value="{{ uid or '' }}" placeholder="1234567890">
-    <button class="btn blue">Søg</button>
+<form method="get" class="actions">
+    <input type="text"
+           name="uid"
+           placeholder="Discord ID"
+           value="{{ uid or '' }}"
+           style="min-width:300px;">
+    <button class="btn blue">🔍 Søg</button>
 </form>
 
+<hr>
+
 {% if uid %}
-    <p class="muted">Viser historik for bruger ID: <strong>{{ uid }}</strong></p>
-{% endif %}
+    {% if orders %}
+        <div class="grid">
+        {% for o in orders %}
+            <div class="card">
+                <h3>📦 {{ o.session }}</h3>
 
-{% if orders %}
-    {% for o in orders %}
-        <div class="card">
-            <strong>📦 {{ o.session }}</strong><br>
-            <small class="muted">{{ o.time }}</small>
+                <p class="muted">{{ o.time }}</p>
 
-            <ul>
-                {% for item, amount in o.items.items() %}
-                    {% if amount > 0 %}
-                        <li>{{ item }} × {{ amount }}</li>
-                    {% endif %}
-                {% endfor %}
-            </ul>
+                <ul>
+                    {% for item, amount in o["items"].items() %}
+                        {% if amount > 0 %}
+                            <li>{{ item }} × {{ amount }}</li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
 
-            <strong>Total:</strong> {{ "{:,}".format(o.total) }} kr
+                <p>
+                    <strong>Total:</strong>
+                    {{ "{:,}".format(o.total) }} kr
+                </p>
+            </div>
+        {% endfor %}
         </div>
-    {% endfor %}
-{% elif uid %}
-    <p class="muted">Ingen ordrer fundet for denne bruger.</p>
+    {% else %}
+        <p>Ingen ordrer fundet for denne bruger.</p>
+    {% endif %}
+{% else %}
+    <p>Indtast et Discord-ID for at se historik.</p>
 {% endif %}
 
 <div class="actions">
-    <a href="/admin/users" class="btn">⬅️ Tilbage til brugere</a>
+    <a class="btn" href="/admin/users">⬅️ Tilbage til brugere</a>
 </div>
 
 {% endblock %}
