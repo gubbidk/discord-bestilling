@@ -96,5 +96,27 @@
 
 </main>
 
+<script>
+let lastHash = null;
+
+async function pollSession() {
+    try {
+        const res = await fetch("/session_data/{{ name }}");
+        const data = await res.json();
+
+        if (lastHash && lastHash !== data.hash) {
+            location.reload();
+        }
+
+        lastHash = data.hash;
+    } catch (e) {
+        console.error("Polling fejl", e);
+    }
+}
+
+setInterval(pollSession, 2000);
+</script>
+
+
 </body>
 </html>

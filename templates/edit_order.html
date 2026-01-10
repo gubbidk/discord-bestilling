@@ -1,93 +1,96 @@
-{% extends "base.html" %}
-{% block content %}
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <title>Rediger ordre</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .edit-box {
+            max-width: 600px;
+            margin: auto;
+        }
 
-<h2 class="page-title">✏️ Rediger ordre</h2>
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            align-items: center;
+        }
 
-{% if not is_admin %}
-<div class="card order-edit">
-    <p style="text-align:center; font-size:1.1rem;">
-        🔒 <strong>Kun administratorer</strong> kan redigere ordrer.
-    </p>
+        .item-row input {
+            width: 70px;
+            padding: 6px;
+            text-align: center;
+        }
 
-    <div class="form-actions" style="justify-content:center;">
-        <a class="btn" href="/session/{{ session }}">
-            ⬅ Tilbage
-        </a>
-    </div>
-</div>
+        .price {
+            opacity: 0.7;
+        }
 
-{% else %}
+        .total {
+            font-size: 1.4em;
+            font-weight: bold;
+            margin-top: 20px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
 
-<div class="card order-edit">
+<div class="card edit-box">
+    <h2>✏️ Rediger ordre</h2>
 
-    <div class="order-header">
-        <div>
-            <h3>{{ order.user }}</h3>
-            <span class="badge">ID {{ order.id }}</span>
+    <form method="post" id="orderForm">
+        {% for item, amount in order["items"].items() %}
+        <div class="item-row">
+            <span>{{ item }}</span>
+            <input
+                type="number"
+                min="0"
+                name="{{ item }}"
+                value="{{ amount }}"
+                data-price="{{ prices[item] }}"
+                onchange="updateTotal()"
+                onkeyup="updateTotal()"
+            >
+            <span class="price">{{ prices[item] }} kr</span>
         </div>
-        <div class="order-total">
-            <span>Total</span>
-            <strong id="live-total">{{ order.total }} kr</strong>
-        </div>
-    </div>
+        {% endfor %}
 
-    <form method="post" class="edit-form">
-
-        <table class="edit-table">
-            <tr>
-                <th>Item</th>
-                <th>Antal</th>
-            </tr>
-
-            {% for item, amount in order["items"].items() %}
-            <tr>
-                <td>{{ item }}</td>
-                <td>
-                    <input
-                        type="number"
-                        name="{{ item }}"
-                        value="{{ amount }}"
-                        min="0"
-                        class="number-input"
-                        data-price="{{ prices[item] }}"
-                    >
-                </td>
-            </tr>
-            {% endfor %}
-        </table>
-
-        <div class="form-actions">
-            <button class="btn success" type="submit">
-                💾 Gem ændringer
-            </button>
-
-            <a class="btn" href="/session/{{ session }}">
-                ⬅ Tilbage
-            </a>
+        <div class="total">
+            Total: <span id="totalPrice">{{ order.total }}</span> kr
         </div>
 
+        <button class="btn primary" type="submit">
+            💾 Gem ændringer
+        </button>
     </form>
 </div>
 
 <script>
 function updateTotal() {
     let total = 0;
-
-    document.querySelectorAll(".number-input").forEach(input => {
+    document.querySelectorAll("input[data-price]").forEach(input => {
         const amount = parseInt(input.value) || 0;
-        const price = parseInt(input.dataset.price) || 0;
+        const price = parseInt(input.dataset.price);
         total += amount * price;
     });
-
-    document.getElementById("live-total").innerText =
-        total.toLocaleString("da-DK") + " kr";
+    document.getElementById("totalPrice").innerText = total;
 }
+</script>
+<script>
+let lastHash = null;
 
-document.querySelectorAll(".number-input").forEach(input => {
-    input.addEventListener("input", updateTotal);
-});
+async function poll() {
+    const res = await fetch("/session_data/{{ session }}");
+    const data = await res.json();
+    if (lastHash && lastHash !== data.hash) {
+        location.reload();
+    }
+    lastHash = data.hash;
+}
+setInterval(poll, 2000);
 </script>
 
-{% endif %}
-
-{% endblock %}
+</body>
+</html>
