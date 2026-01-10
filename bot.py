@@ -1,12 +1,12 @@
 import os
 import json
+import time
 import discord
 from discord.ext import commands
-from discord import app_commands
 from datetime import datetime
 
 # =====================
-# ENV / KONFIG
+# KONFIG
 # =====================
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 if not DISCORD_TOKEN:
@@ -14,10 +14,10 @@ if not DISCORD_TOKEN:
 
 BESTIL_CHANNEL_ID = int(os.getenv("BESTIL_CHANNEL_ID", "0"))
 if BESTIL_CHANNEL_ID == 0:
-    raise RuntimeError("BESTIL_CHANNEL_ID mangler eller er forkert")
+    raise RuntimeError("BESTIL_CHANNEL_ID mangler")
 
 SESSIONS_FILE = "sessions.json"
-LAGER_FILE = "lager.json"
+PRICES_FILE = "prices.json"
 
 # =====================
 # DISCORD SETUP
@@ -28,7 +28,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # =====================
-# HJÆLPEFUNKTIONER
+# DATA
 # =====================
 def load_sessions():
     if not os.path.exists(SESSIONS_FILE):
@@ -40,32 +40,23 @@ def save_sessions(data):
     with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-def load_lager():
-    if not os.path.exists(LAGER_FILE):
+def load_prices():
+    if not os.path.exists(PRICES_FILE):
         return {}
-    with open(LAGER_FILE, "r", encoding="utf-8") as f:
+    with open(PRICES_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def new_order(user, items):
-    return {
-        "id": str(datetime.now().timestamp()),
-        "user": user,
-        "items": items,
-        "total": 0,
-        "time": datetime.now().strftime("%d-%m-%Y %H:%M")
-    }
+PRICES = load_prices()
 
 def calc_total(items):
-    # Hvis du har prices.json kan du udvide her
-    return sum(v for v in items.values())
+    return sum(items[i] * PRICES.get(i, 0) for i in items)
 
 # =====================
 # EVENTS
 # =====================
 @bot.event
 async def on_ready():
-    await bot.tree.sync()
-    print(f"✅ Bot logged in as {bot.user}")
+    print(f"✅ Bot online som {bot.user}")
 
 @bot.event
 async def on_message(message: discord.Message):
@@ -75,143 +66,96 @@ async def on_message(message: discord.Message):
     if message.channel.id != BESTIL_CHANNEL_ID:
         return
 
-    content = message.content.lower().strip()
-    parts = content.split()
+    content = message.content.strip().lower()
+    if not content:
+        return
+
+    user = str(message.author)
 
     sessions = load_sessions()
     current = sessions.get("current")
 
+    # =====================
+    # 📦 LAGER
+    # =====================
+    if content == "lager":
+        text = "📦 **Lager / Priser**\n"
+        for item, price in PRICES.items():
+            text += f"• {item} – {price:,} kr\n"
+
+        await message.channel.send(text, delete_after=15)
+        try:
+            await message.delete()
+        except:
+            pass
+        return
+
+    # =====================
+    # INGEN AKTIV BESTILLING
+    # =====================
     if not current:
+        await message.channel.send(
+            f"🔴 {message.author.mention} der er ingen aktiv bestilling",
+            delete_after=6
+        )
         return
 
     session = sessions["sessions"].get(current)
     if not session or not session.get("open"):
-        return
-
-    lager = load_lager()
-
-    # -------- LAGER --------
-    if content == "lager":
-        lines = ["📦 **Lagerstatus**"]
-        for item, max_amount in lager.items():
-            used = sum(
-                o["items"].get(item, 0)
-                for o in session["orders"]
-            )
-            lines.append(f"{item}: {max_amount - used}")
-        await message.channel.send("\n".join(lines), delete_after=10)
-        try:
-            await message.delete()
-        except:
-            pass
-        return
-
-    # -------- BESTIL ITEM --------
-    if len(parts) != 2:
-        return
-
-    item, amount = parts
-    if item not in lager or not amount.isdigit():
-        return
-
-    amount = int(amount)
-    if amount <= 0:
-        return
-
-    used = sum(
-        o["items"].get(item, 0)
-        for o in session["orders"]
-    )
-
-    left = lager[item] - used
-    if amount > left:
         await message.channel.send(
-            f"❌ Kun {left} {item} tilbage",
+            f"🔒 {message.author.mention} bestillingen er lukket",
+            delete_after=6
+        )
+        return
+
+    orders = session["orders"]
+
+    order = next((o for o in orders if o["user"] == user), None)
+    if not order:
+        order = {
+            "id": str(time.time()),
+            "user": user,
+            "items": {k: 0 for k in PRICES},
+            "total": 0,
+            "time": datetime.now().strftime("%d-%m-%Y %H:%M")
+        }
+        orders.append(order)
+
+    # =====================
+    # PARSE "2 veste" / "veste"
+    # =====================
+    parts = content.split()
+    amount = 1
+    item = None
+
+    if len(parts) == 1:
+        item = parts[0]
+    elif len(parts) >= 2 and parts[0].isdigit():
+        amount = int(parts[0])
+        item = parts[1]
+
+    if item not in PRICES:
+        await message.channel.send(
+            f"❌ Ukendt vare: `{item}`",
             delete_after=5
         )
-        try:
-            await message.delete()
-        except:
-            pass
         return
-
-    user_key = str(message.author)
-
-    order = next(
-        (o for o in session["orders"] if o["user"] == user_key),
-        None
-    )
-
-    if not order:
-        order = new_order(
-            user_key,
-            {i: 0 for i in lager}
-        )
-        session["orders"].append(order)
 
     order["items"][item] += amount
     order["total"] = calc_total(order["items"])
 
     save_sessions(sessions)
 
+    await message.channel.send(
+        f"✅ {message.author.mention} **+{amount} {item}** "
+        f"(Total: {order['total']:,} kr)",
+        delete_after=6
+    )
+
     try:
         await message.delete()
     except:
         pass
-
-    await message.channel.send(
-        f"✅ {message.author.mention} +{amount} {item}",
-        delete_after=3
-    )
-
-    await bot.process_commands(message)
-
-# =====================
-# SLASH COMMAND
-# =====================
-@bot.tree.command(name="bestilling", description="Se din nuværende bestilling")
-async def bestilling(interaction: discord.Interaction):
-    sessions = load_sessions()
-    current = sessions.get("current")
-
-    if not current:
-        await interaction.response.send_message(
-            "🔴 Ingen aktiv bestilling",
-            ephemeral=True
-        )
-        return
-
-    orders = sessions["sessions"].get(current, {}).get("orders", [])
-    user = str(interaction.user)
-
-    order = next(
-        (o for o in orders if o["user"] == user),
-        None
-    )
-
-    if not order:
-        await interaction.response.send_message(
-            "❌ Du har ingen bestilling",
-            ephemeral=True
-        )
-        return
-
-    lines = [
-        f"• {item}: {amount}"
-        for item, amount in order["items"].items()
-        if amount > 0
-    ]
-
-    text = (
-        f"📦 **Din bestilling ({current})**\n\n"
-        + ("\n".join(lines) if lines else "Ingen varer")
-        + f"\n\n💰 **Total:** {order['total']:,} kr"
-    )
-
-    await interaction.response.send_message(
-        text,
-        ephemeral=True
-    )
 
 # =====================
 # START
