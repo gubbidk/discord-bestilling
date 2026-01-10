@@ -95,25 +95,25 @@ async def on_message(message: discord.Message):
     # 📦 LAGER KOMMANDO
     # =====================
     if content == "lager":
-    lager = load_lager()
+        lager = load_lager()
 
-    if not lager:
-        await message.channel.send(
-            "📦 **Lagerstatus**\n_(Ingen varer i lageret endnu)_",
-            delete_after=10
-        )
+        if not lager:
+            await message.channel.send(
+                "📦 **Lagerstatus**\n_(Ingen varer i lageret endnu)_",
+                delete_after=10
+            )
+            return
+
+        lines = ["📦 **Lagerstatus**"]
+        for item, max_amount in lager.items():
+            lines.append(f"• **{item}**: {max_amount}")
+
+        await message.channel.send("\n".join(lines), delete_after=15)
+        try:
+            await message.delete()
+        except discord.NotFound:
+            pass
         return
-
-    lines = ["📦 **Lagerstatus**"]
-    for item, max_amount in lager.items():
-        lines.append(f"• **{item}**: {max_amount}")
-
-    await message.channel.send("\n".join(lines), delete_after=15)
-    try:
-        await message.delete()
-    except discord.NotFound:
-        pass
-    return
 
 
     # =====================
