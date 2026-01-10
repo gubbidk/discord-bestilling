@@ -6,7 +6,8 @@
 {% for e in events %}
 <div class="card">
     <strong>{{ e.time }}</strong><br>
-    {{ e.admin }} → {{ e.action }} → {{ e.target }}
+    {{ e.admin }} → {{ e.action }} →
+    <pre style="margin:4px 0 0 0; white-space:pre-wrap;">{{ e.target }}</pre>
 </div>
 {% endfor %}
 
