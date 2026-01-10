@@ -95,7 +95,7 @@ def login():
     }
     return redirect("https://discord.com/api/oauth2/authorize?" + urlencode(params))
 
-@app.route("/auth/callback")
+@@app.route("/auth/callback")
 def auth_callback():
     code = request.args.get("code")
     if not code:
@@ -119,46 +119,56 @@ def auth_callback():
 
     headers = {"Authorization": f"Bearer {token}"}
 
-    user = requests.get("https://discord.com/api/users/@me", headers=headers).json()
-    member = requests.get(
+    # Discord user
+    user = requests.get(
+        "https://discord.com/api/users/@me",
+        headers=headers
+    ).json()
+
+    # Guild member
+    member_res = requests.get(
         f"https://discord.com/api/users/@me/guilds/{DISCORD_GUILD_ID}/member",
         headers=headers
     )
 
-    if member.status_code != 200:
-        return "Ikke medlem af serveren", 403
+    if member_res.status_code != 200:
+        return "Du er ikke medlem af Discord-serveren", 403
 
     if is_blocked(user["id"]):
         return "Du er blokeret fra web-panelet", 403
 
-    roles = member.json().get("roles", [])
+    roles = member_res.json().get("roles", [])
 
+    # Hent guild roles (kræver bot token)
     guild_roles = requests.get(
         f"https://discord.com/api/guilds/{DISCORD_GUILD_ID}/roles",
-        headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"}
+        headers={
+            "Authorization": f"Bot {os.getenv('DISCORD_TOKEN')}"
+        }
     ).json()
 
     role_map = {r["id"]: r["name"] for r in guild_roles}
-    DISCORD_USER_ROLE = os.getenv("DISCORD_USER_ROLE")
 
-user_has_access = False
-is_admin = False
+    user_has_access = False
+    admin = False
 
-for r in roles:
-    role_name = role_map.get(r)
-    if role_name == DISCORD_ADMIN_ROLE:
-        is_admin = True
-        user_has_access = True
-    if role_name == DISCORD_USER_ROLE:
-        user_has_access = True
+    for r in roles:
+        role_name = role_map.get(r)
+        if role_name == DISCORD_ADMIN_ROLE:
+            admin = True
+            user_has_access = True
+        if role_name == DISCORD_USER_ROLE:
+            user_has_access = True
+
     if not user_has_access:
         return "Du har ikke adgang til web-panelet", 403
+
     session["user"] = {
-    "id": user["id"],
-    "name": user["username"],
-    "avatar": user.get("avatar")
+        "id": user["id"],
+        "name": user["username"],
+        "avatar": user.get("avatar")
     }
-    session["admin"] = is_admin
+    session["admin"] = admin
 
     return redirect("/")
 
