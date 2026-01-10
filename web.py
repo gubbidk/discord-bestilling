@@ -459,7 +459,7 @@ def edit_order(session_name, order_id):
     if not session_data:
         return "Session not found", 404
     orders = session_data.get("orders", [])
-    order = next((o for in orders if o["id"] == order_id), None)
+    order = next((o for o in orders if o["id"] == order_id), None)
     if not order:
         return "Order not found", 404
     
