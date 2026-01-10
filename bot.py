@@ -63,10 +63,10 @@ def calculate_remaining_lager():
 
     used = {item: 0 for item in lager}
     for s in sessions.get("sessions", {}).values():
-            for o in s.get("orders", []):
-                for item, amount in o.get("items", {}).items():
-                    if item in used:
-                        used[item] += amount
+        for o in s.get("orders", []):
+            for item, amount in o.get("items", {}).items():
+                if item in used:
+                    used[item] += amount
     remaining = {}
     for item, max_amount in lager.items():
         remaininng[item] = max(0, max_amount . used.get(item, 0))
