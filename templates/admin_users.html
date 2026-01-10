@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>👥 Brugere</h2>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Bruger</th>
+            <th>Discord ID</th>
+            <th>Status</th>
+            <th>Handling</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for id, name in users.items() %}
+        <tr>
+            <td>{{ name }}</td>
+            <td>{{ id }}</td>
+            <td>
+                {% if id in blocked %}
+                    🔴 Blokeret
+                {% else %}
+                    🟢 Aktiv
+                {% endif %}
+            </td>
+            <td>
+                {% if id in blocked %}
+                    <a class="btn green" href="/admin/unblock/{{ id }}">Fjern blokering</a>
+                {% else %}
+                    <a class="btn danger"
+                       href="/admin/block/{{ id }}"
+                       onclick="return confirm('Bloker bruger?')">Bloker</a>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

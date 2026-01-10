@@ -33,7 +33,7 @@
 
 <main class="container">
 
-<!-- BESTILLINGER -->
+<!-- 🧾 ORDRER -->
 <section class="card">
     <h2>🧾 Ordrer</h2>
 
@@ -97,7 +97,21 @@
     {% endif %}
 </section>
 
-<!-- ADMIN -->
+<!-- 📦 LAGERSTATUS (NY FEATURE) -->
+<section class="card">
+    <h2>📦 Lagerstatus</h2>
+
+    <div class="lager-grid">
+        {% for item, s in lager_status.items() %}
+        <div class="lager-item {{ s.level }}">
+            <strong>{{ item }}</strong><br>
+            {{ s.left }} / {{ s.max }}
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- 🛠 ADMIN -->
 {% if admin %}
 <section class="card">
     <h2>🛠 Admin</h2>
@@ -111,7 +125,7 @@
 
 </main>
 
-<!-- REAL-TIME UPDATE -->
+<!-- 🔄 REAL-TIME UPDATE -->
 <script>
 let lastHash = null;
 
