@@ -61,7 +61,7 @@ def calculate_remaining_lager():
     lager = load_lager()
     sessions = load_sessions()
 
-    used = {item: 0 forr item in lager}
+    used = {item: 0 for item in lager}
     for s in sessions.get("sessions", {}).values():
             for o in s.get("orders", []):
                 for item, amount in o.get("items", {}).items():
