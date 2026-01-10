@@ -175,7 +175,7 @@ def auth_callback():
 # =====================
 # ROUTES
 # =====================
-@app.routes("/edit_order/<session_name>/<order_id>, methods=["GET", "POST"])
+@app.route("/edit_order/<session_name>/<order_id>", methods=["GET", "POST"])
 def edit_order(session_name, order_id):
     if not is_admin():
         return "Fuck dig", 403
