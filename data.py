@@ -2,7 +2,11 @@ import json
 import os
 from datetime import datetime
 
-SESSIONS_FILE = "sessions.json"
+DATA_DIR = "/data"
+
+SESSIONS_FILE = f"{DATA_DIR}/sessions.json"
+ACCESS_FILE   = f"{DATA_DIR}/access.json"
+AUDIT_FILE    = f"{DATA_DIR}/audit.json"
 
 def load_sessions():
     if not os.path.exists(SESSIONS_FILE):

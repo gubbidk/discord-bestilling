@@ -9,11 +9,14 @@ from flask import Flask, render_template, request, redirect, session, jsonify
 # =====================
 # KONFIGURATION
 # =====================
-SESSIONS_FILE = "sessions.json"
-ACCESS_FILE = "access.json"
-AUDIT_FILE = "audit.json"
-LAGER_FILE = "lager.json"
-PRICES_FILE = "prices.json"
+DATA_DIR = os.getenv("DATA_DIR", "/data")
+os.makedirs(DATA_DIR, exist_ok=True)
+
+SESSIONS_FILE = f"{DATA_DIR}/sessions.json"
+ACCESS_FILE   = f"{DATA_DIR}/access.json"
+AUDIT_FILE    = f"{DATA_DIR}/audit.json"
+LAGER_FILE    = f"{DATA_DIR}/lager.json"
+PRICES_FILE   = f"{DATA_DIR}/prices.json"
 
 ADMIN_KEY = os.getenv("ADMIN_KEY", "thomas")
 
