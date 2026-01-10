@@ -178,26 +178,33 @@ def auth_callback():
 @app.route("/edit_order/<session_name>/<order_id>", methods=["GET", "POST"])
 def edit_order(session_name, order_id):
     if not is_admin():
-        return "Fuck dig", 403
+        return "Forbidden", 403
+
     data = normalize(load_sessions())
-    if session_name not in data ["sessions"]:
-        return "Bestilling findes ike", 404
-    
+
+    if session_name not in data["sessions"]:
+        return "Bestilling findes ikke", 404
+
     orders = data["sessions"][session_name]["orders"]
     order = next((o for o in orders if o.get("id") == order_id), None)
+
     if not order:
         return "Ordre findes ikke", 404
+
     prices = load_json("prices.json", {})
+
     if request.method == "POST":
         total = 0
-        for item inn order["items"]
-            amount = innt(request.form.get(item, 0))
+        for item in order["items"]:
+            amount = int(request.form.get(item, 0))
             order["items"][item] = max(0, amount)
-            total += amount * price.get(item, 0)
+            total += amount * prices.get(item, 0)
+
         order["total"] = total
-        save_sessionns(data)
-        
+        save_sessions(data)
+
         return redirect(f"/session/{session_name}")
+
     return render_template(
         "edit_order.html",
         order=order,
@@ -205,6 +212,7 @@ def edit_order(session_name, order_id):
         prices=prices,
         admin=True
     )
+
 
 
 @app.route("/")
