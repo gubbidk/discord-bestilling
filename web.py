@@ -139,14 +139,26 @@ def auth_callback():
     ).json()
 
     role_map = {r["id"]: r["name"] for r in guild_roles}
-    admin = any(role_map.get(r) == DISCORD_ADMIN_ROLE for r in roles)
+    DISCORD_USER_ROLE = os.getenv("DISCORD_USER_ROLE")
 
+user_has_access = False
+is_admin = False
+
+for r in roles:
+    role_name = role_map.get(r)
+    if role_name == DISCORD_ADMIN_ROLE:
+        is_admin = True
+        user_has_access = True
+    if role_name == DISCORD_USER_ROLE:
+        user_has_access = True
+    if not user_has_access:
+        return "Du har ikke adgang til web-panelet", 403
     session["user"] = {
-        "id": user["id"],
-        "name": user["username"],
-        "avatar": user.get("avatar")
+    "id": user["id"],
+    "name": user["username"],
+    "avatar": user.get("avatar")
     }
-    session["admin"] = admin
+    session["admin"] = is_admin
 
     return redirect("/")
 
