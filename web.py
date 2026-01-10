@@ -338,10 +338,11 @@ def admin_users():
         return "Forbidden", 403
 
     access = load_access()
+
     return render_template(
         "admin_users.html",
-        users=access["users"],
-        blocked=access["blocked"],
+        users=access.get("users", {}),
+        blocked=access.get("blocked", []),
         user=session["user"],
         admin=True
     )
