@@ -113,7 +113,7 @@ def load_audit():
     return load_json(AUDIT_FILE, {"events": []})
 
 def save_audit():
-    save_jsonn(AUDIT_FILE, data)
+    save_json(AUDIT_FILE, data)
 
 def audit_log(action, admin, target):
     data = load_audit()
@@ -406,6 +406,34 @@ def close_session():
         save_sessions(data)
 
     return redirect("/")
+
+@app.route("/delete_session/<session_name>")
+def delete_session(session_name):
+    if not is_admin():
+        return "Forbidden", 403
+
+    data = normalize(load_sessions())
+
+    if session_name not in data["sessions"]:
+        return "Not found", 404
+
+    # Hvis den slettede session er den aktive → nulstil current
+    if data.get("current") == session_name:
+        data["current"] = None
+
+    # Fjern sessionen
+    del data["sessions"][session_name]
+    save_sessions(data)
+
+    # Audit log
+    audit_log(
+        "delete_session",
+        session["user"]["name"],
+        session_name
+    )
+
+    return redirect("/")
+
 
 @app.route("/admin/block/<discord_id>")
 def block_user(discord_id):
