@@ -62,15 +62,19 @@ def calculate_remaining_lager():
     sessions = load_sessions()
 
     used = {item: 0 for item in lager}
+
     for s in sessions.get("sessions", {}).values():
         for o in s.get("orders", []):
             for item, amount in o.get("items", {}).items():
                 if item in used:
                     used[item] += amount
+
     remaining = {}
     for item, max_amount in lager.items():
-        remaininng[item] = max(0, max_amount . used.get(item, 0))
-    return remaining  
+        remaining[item] = max(0, max_amount - used.get(item, 0))
+
+    return remaining
+  
 # =====================
 # DISCORD SETUP
 # =====================
@@ -108,7 +112,7 @@ async def on_message(message: discord.Message):
     # 📦 LAGER KOMMANDO
     # =====================
     if content == "lager":
-        remaininng = calculate_remaining_lager()
+        remaining = calculate_remaining_lager()
 
         if not remaining:
             await message.channel.send(
@@ -180,12 +184,29 @@ async def on_message(message: discord.Message):
         amount = int(parts[0])
         item = parts[1]
 
-    if item not in prices or prices.get(item, 0) <= 0:
+    remaining = calculate_remaining_lager()
+
+    if item not in prices:
         await message.channel.send(
             f"❌ Ukendt vare: `{item}`",
             delete_after=6
         )
         return
+
+    if remaining.get(item, 0) <= 0:
+        await message.channel.send(
+            f"⛔ **{item}** er udsolgt",
+            delete_after=6
+        )
+        return
+
+    if amount > remaining.get(item, 0):
+        await message.channel.send(
+            f"⚠️ Kun **{remaining.get(item, 0)} {item}** tilbage på lager",
+            delete_after=6
+        )
+        return
+
 
     order["items"][item] += amount
 
