@@ -275,12 +275,24 @@ def auth_callback():
         return "Du er blokeret fra web-panelet", 403
 
     roles = member.json().get("roles", [])
-    guild_roles = requests.get(
-        f"https://discord.com/api/guilds/{DISCORD_GUILD_ID}/roles",
-        headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"}
-    ).json()
+    resp = requests.get(
+    f"https://discord.com/api/guilds/{DISCORD_GUILD_ID}/roles",
+    headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"}
+)
 
-    role_map = {r["id"]: r["name"] for r in guild_roles}
+if resp.status_code != 200:
+    print("⚠️ Kunne ikke hente roller fra Discord:", resp.text)
+    return "Fejl ved hentning af Discord-roller", 500
+
+guild_roles = resp.json()
+
+# Ekstra sikkerhed
+if not isinstance(guild_roles, list):
+    print("⚠️ Uventet svar fra Discord:", guild_roles)
+    return "Discord API fejl (roller)", 500
+
+role_map = {r["id"]: r["name"] for r in guild_roles}
+
 
     admin = False
     access_ok = False
