@@ -2,123 +2,99 @@
 <html lang="da">
 <head>
     <meta charset="UTF-8">
-    <title>Bestilling – {{ name }}</title>
+    <title>{{ name }}</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
-<div class="container">
+<!-- HEADER -->
+<header class="top">
+    <div class="header-left">
+        {% if user.avatar %}
+        <img
+            src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png"
+            class="avatar"
+        >
+        {% endif %}
 
-    <!-- HEADER -->
-    <header class="card header-card">
-        <div class="header-left">
-            {% if user.avatar %}
-                <img
-                    src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png"
-                    alt="avatar"
-                    class="avatar"
-                >
-            {% endif %}
-            <div>
-                <h1>📦 {{ name }}</h1>
-                <p class="muted">
-                    Logget ind som <strong>{{ user.name }}</strong>
-                    {% if admin %}<span class="admin-badge">ADMIN</span>{% endif %}
-                </p>
+        <div>
+            <h1>📦 {{ name }}</h1>
+            <div class="muted">
+                Logget ind som <strong>{{ user.name }}</strong>
+                {% if admin %} ADMIN {% endif %}
             </div>
+            <a href="/" class="btn blue">← Oversigt</a>
         </div>
+    </div>
+</header>
 
-        <div class="header-actions">
-            <a href="/" class="btn secondary">⬅ Oversigt</a>
-        </div>
-    </header>
+<main class="container">
 
-    <!-- ORDERS -->
-    <section class="card">
-        <h2>🧾 Bestillinger</h2>
+<!-- BESTILLINGER -->
+<section class="card">
+    <h2>🧾 Bestillinger</h2>
 
-        <table class="orders-table">
-            <thead>
-                <tr>
-                    <th>Bruger</th>
-                    <th>Bestilling</th>
-                    <th>Total</th>
-                    {% if admin %}
-                        <th>Admin</th>
-                    {% endif %}
-                </tr>
-            </thead>
-
-            <tbody>
-            {% for order in orders %}
-                <tr>
-                    <td>
-                        <strong>{{ order.user }}</strong>
-                    </td>
-
-                    <td>
-                        {% if order.items %}
-                            {% for item, amount in order.items.items() %}
-                                {% if amount > 0 %}
-                                    <div class="item-line">
-                                        <span>{{ item }}</span>
-                                        <span class="amount">× {{ amount }}</span>
-                                    </div>
-                                {% endif %}
-                            {% endfor %}
-                        {% else %}
-                            <span class="muted">Ingen varer</span>
+    {% if orders %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Bruger</th>
+                <th>Bestilling</th>
+                <th>Total</th>
+                {% if admin %}
+                <th>Admin</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+        {% set grand_total = 0 %}
+        {% for o in orders %}
+            {% set grand_total = grand_total + o.total %}
+            <tr>
+                <td>{{ o.user }}</td>
+                <td>
+                    {% for item, amount in o.items.items() %}
+                        {% if amount > 0 %}
+                            {{ item }} x{{ amount }}<br>
                         {% endif %}
-                    </td>
+                    {% endfor %}
+                </td>
+                <td>{{ "{:,}".format(o.total) }} kr</td>
 
-                    <td>
-                        <strong>{{ order.total }} kr</strong>
-                    </td>
+                {% if admin %}
+                <td>
+                    <a href="/edit_order/{{ name }}/{{ o.id }}">✏️</a>
+                    <a href="/delete_order/{{ name }}/{{ o.id }}"
+                       onclick="return confirm('Slet ordre?')">❌</a>
+                </td>
+                {% endif %}
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
 
-                    {% if admin %}
-                    <td class="admin-actions">
-                        <a
-                            href="/admin/block/{{ order.user_id }}"
-                            class="btn danger small"
-                            onclick="return confirm('Bloker bruger fra web-panelet?')"
-                        >
-                            🚫 Block
-                        </a>
+    <div class="total-line">
+        <strong>Samlet total:</strong> {{ "{:,}".format(grand_total) }} kr
+    </div>
 
-                        <a
-                            href="/admin/unblock/{{ order.user_id }}"
-                            class="btn success small"
-                            onclick="return confirm('Fjern blokering?')"
-                        >
-                            ✅ Unblock
-                        </a>
-                    </td>
-                    {% endif %}
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-
-        <div class="total-box">
-            <span>Samlet total</span>
-            <strong>{{ total }} kr</strong>
-        </div>
-    </section>
-
-    <!-- ADMIN PANEL -->
-    {% if admin %}
-    <section class="card admin-card">
-        <h2>🛠 Admin</h2>
-
-        <div class="admin-buttons">
-            <a href="/open_session" class="btn primary">➕ Åbn ny bestilling</a>
-            <a href="/close_session" class="btn warning">🔒 Luk bestilling</a>
-            <a href="/admin/audit" class="btn secondary">📜 Audit log</a>
-        </div>
-    </section>
+    {% else %}
+        <p class="muted">Samlet total 0 kr</p>
     {% endif %}
+</section>
 
-</div>
+<!-- ADMIN -->
+{% if admin %}
+<section class="card">
+    <h2>🛠 Admin</h2>
+    <div class="admin-bar">
+        <a href="/open_session" class="btn green">➕ Åbn ny bestilling</a>
+        <a href="/close_session" class="btn orange">🔒 Luk bestilling</a>
+        <a href="/admin/audit" class="btn blue">📜 Audit log</a>
+    </div>
+</section>
+{% endif %}
+
+</main>
 
 </body>
 </html>

@@ -131,3 +131,76 @@ th, td {
 .muted {
     opacity: 0.5;
 }
+
+.session-list {
+    list-style: none;
+    padding: 0;
+}
+
+.session-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid #ddd;
+}
+
+.session-link {
+    text-decoration: none;
+    color: inherit;
+}
+
+.session-link:hover {
+    opacity: 0.8;
+}
+
+.session-actions a {
+    margin-left: 10px;
+    font-size: 18px;
+    text-decoration: none;
+}
+
+.muted {
+    color: #777;
+    font-size: 0.9em;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table th, .table td {
+    padding: 10px;
+    border-bottom: 1px solid #2a2a2a;
+    vertical-align: top;
+}
+
+.table th {
+    text-align: left;
+}
+
+.total-line {
+    margin-top: 10px;
+    font-size: 1.1em;
+}
+
+.muted {
+    color: #888;
+}
+
+.admin-bar .btn {
+    margin-right: 10px;
+}

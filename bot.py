@@ -74,6 +74,7 @@ async def on_message(message: discord.Message):
     if not content:
         return
 
+    # 🔄 Load data live
     lager = load_lager()
     prices = load_prices()
     user = str(message.author)
@@ -105,7 +106,6 @@ async def on_message(message: discord.Message):
         )
         return
 
-    # Sikr korrekt struktur
     session = data["sessions"].setdefault(
         current,
         {"open": True, "orders": []}
@@ -124,15 +124,15 @@ async def on_message(message: discord.Message):
     if not order:
         order = {
             "id": str(time.time()),
-            "user": str(message.author),
-            "user_id": str(message.author.id),  # ✅ VIGTIG
-            "items": {k: 0 for k in PRICES},
+            "user": user,
+            "user_id": str(message.author.id),  # ✅ Discord ID
+            "items": {k: 0 for k in prices},     # ✅ FIX HER
             "total": 0,
             "time": datetime.now().strftime("%d-%m-%Y %H:%M")
-}
+        }
         orders.append(order)
 
-    # parsing: "2 veste" / "veste"
+    # parsing: "2 cola" / "cola"
     parts = content.split()
     amount = 1
     item = None
@@ -179,7 +179,6 @@ async def on_message(message: discord.Message):
     description="Se din nuværende bestilling"
 )
 async def bestilling(interaction: discord.Interaction):
-    # 🔐 ACK med det samme (forhindrer 10062)
     await interaction.response.defer(ephemeral=True)
 
     data = load_sessions()

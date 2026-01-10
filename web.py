@@ -287,6 +287,27 @@ def session_data(name):
     payload = json.dumps(orders, sort_keys=True)
     return jsonify({"hash": hashlib.md5(payload.encode()).hexdigest()})
 
+@app.route("/toggle_session/<name>")
+def toggle_session(name):
+    if not is_admin():
+        return "Forbidden", 403
+
+    data = normalize(load_sessions())
+
+    if name not in data["sessions"]:
+        return redirect("/")
+
+    session = data["sessions"][name]
+    session["open"] = not session.get("open", False)
+
+    if not session["open"] and data.get("current") == name:
+        data["current"] = None
+    elif session["open"]:
+        data["current"] = name
+
+    save_sessions(data)
+    return redirect("/")
+
 # =====================
 # START
 # =====================
