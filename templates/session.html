@@ -1,102 +1,99 @@
-{% extends "base.html" %}
-{% block content %}
+<!DOCTYPE html>
+<html lang="da">
+<head>
+	<meta charset="UTF-8">
+	<title>Bestilling - {{ name }}</title>
+	<link rel="stylesheet" href="/static/style.ss">
+</head>
+<body>
 
-<h2>📦 {{ name }}</h2>
 
-<div class="summary">
-    <div class="summary-card">
-        <span>Total pris</span>
-        <strong>{{ total }} kr</strong>
-    </div>
-</div>
+<header style="margin-bottom:20px;">
+	<h1>📦 Bestilling: {{ nname }}</h1>
+	
+	<div style="display:flex;align.items:center;gap:10px;">
+		{% if user.avatar %}
+			<img
+				src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png"
+				alt="avatar"
+				width="40"
+				style="border-radius:50%;"
+				
+			>
+		{% endif %}
+		<strong>{{ user.name }}</strong>
+		{% if admin %}
+			<span style="color:red;">(ADMIN)</span>
+		{% endif %}
+	</div>
+	
+	<p><a href="/"⬅ Tilbage til oversigt</a></p>
+</header>
 
-{% if orders|length == 0 %}
-<p class="muted">Ingen ordrer endnu</p>
-{% endif %}
+<table border="1" cellpadding="8" cellspacing="0" width="100%">
+	<thread>
+		<tr>
+			<th>Bruger</th>
+			<th>Bestilling</th>
+			<th>Total</th>
+			{% if admin%}
+				<th>Admin</th>
+			{% endif %}
+		</tr>
+	</thread>
 
-{% for o in orders %}
-<div style="display:flex;align-items:center;gap:10px;">
-    {% if o.discord_id %}
-    <img
-        src="https://cdn.discordapp.com/avatars/{{ o.discord_id }}/{{ o.avatar }}.png"
-        onerror="this.style.display='none'"
-        style="width:32px;height:32px;border-radius:50%;">
-    {% endif %}
-
-    <h3>{{ o.user }}</h3>
-</div>
-
-    <table>
-        <tr>
-            <th>Item</th>
-            <th>Antal</th>
+<tbody>
+{% for order in orders %}
+	<tr>
+		<td>{{ order.user }}</td>
+		
+		<td>
+			{% if order.items %}
+				{% for item, amount in order.items.items() %}
+					{% if amount > 0 %}
+						{{ item }}: {{ amount }}<br>
+					{% endif %}
+				{% endfor %}
+			{% else %}
+				<em>Ingen varer</em>
+			{% endif %}
+		</td>
+		
+		<td>{{ order.total }} kr</td>
+		
+		{% if admin %}
+		<td>
+			<a href="/admin/block/{{ order.user_id }}"
+				onclick="Return confirm('Blocker bruger?')">
+					🚫 Block
+                </a>
+                <br>
+                <a href="/admin/unblock/{{ order.user_id }}"
+                   onclick="return confirm('Fjern blokering?')">
+                    ✅ Unblock
+                </a>
+            </td>
+            {% endif %}
         </tr>
+    {% endfor %}
+    </tbody>
+</table>
 
-        {% for item, amount in o["items"].items() %}
-        {% if amount > 0 %}
-        <tr>
-            <td>{{ item }}</td>
-            <td>{{ amount }}</td>
-        </tr>
-        {% endif %}
-        {% endfor %}
-    </table>
+<p style="margin-top:20px;">
+    <strong>Samlet total:</strong> {{ total }} kr
+</p>
 
-    <div class="order-footer">
-        <strong>{{ o.total }} kr</strong>
-
-        {% if session.admin %}
-        <div class="actions">
-{% if session.admin %}
-
-<a class="btn small" href="/edit_order/{{ name }}/{{ o.id }}">
-    ✏️ Rediger
-</a>
-
-<a class="btn small danger" href="/delete_order/{{ name }}/{{ o.id }}">
-    🗑️ Slet
-</a>
-
-{% if o.discord_id %}
-<a class="btn small warning"
-   href="/admin/block/{{ o.discord_id }}"
-   onclick="return confirm('Blokér bruger fra web?')">
-   🚫 Blokér
-</a>
-
-<a class="btn small success"
-   href="/admin/unblock/{{ o.discord_id }}"
-   onclick="return confirm('Fjern blokering?')">
-   🔓 Fjern blok
-</a>
+{% if admin %}
+<hr>
+<section>
+    <h2>🛠 Admin funktioner</h2>
+    <ul>
+        <li><a href="/admin/audit">📜 Se audit log</a></li>
+        <li><a href="/open_session">➕ Åbn ny bestilling</a></li>
+        <li><a href="/close_session">🔒 Luk aktiv bestilling</a></li>
+    </ul>
+</section>
 {% endif %}
 
-{% endif %}
-</div>
-
-
-
-</div>
-{% endfor %}
-
-<script>
-let lastHash = null;
-
-async function checkUpdates() {
-    const res = await fetch("/session_data/{{ name }}");
-    const data = await res.json();
-
-    if (lastHash === null) {
-        lastHash = data.hash;
-        return;
-    }
-
-    if (data.hash !== lastHash) {
-        location.reload();
-    }
-}
-
-setInterval(checkUpdates, 3000);
-</script>
-
-{% endblock %}
+</body>
+</html>
