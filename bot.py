@@ -125,7 +125,7 @@ async def on_message(message: discord.Message):
         order = {
             "id": str(time.time()),
             "user": str(message.author),
-            "discord_id": str(message.author.id),  # ✅ VIGTIG
+            "user_id": str(message.author.id),  # ✅ VIGTIG
             "items": {k: 0 for k in PRICES},
             "total": 0,
             "time": datetime.now().strftime("%d-%m-%Y %H:%M")
