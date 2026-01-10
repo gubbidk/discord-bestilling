@@ -1,99 +1,124 @@
 <!DOCTYPE html>
 <html lang="da">
 <head>
-	<meta charset="UTF-8">
-	<title>Bestilling - {{ name }}</title>
-	<link rel="stylesheet" href="/static/style.ss">
+    <meta charset="UTF-8">
+    <title>Bestilling – {{ name }}</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
+<div class="container">
 
-<header style="margin-bottom:20px;">
-	<h1>📦 Bestilling: {{ nname }}</h1>
-	
-	<div style="display:flex;align.items:center;gap:10px;">
-		{% if user.avatar %}
-			<img
-				src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png"
-				alt="avatar"
-				width="40"
-				style="border-radius:50%;"
-				
-			>
-		{% endif %}
-		<strong>{{ user.name }}</strong>
-		{% if admin %}
-			<span style="color:red;">(ADMIN)</span>
-		{% endif %}
-	</div>
-	
-	<p><a href="/"⬅ Tilbage til oversigt</a></p>
-</header>
-
-<table border="1" cellpadding="8" cellspacing="0" width="100%">
-	<thread>
-		<tr>
-			<th>Bruger</th>
-			<th>Bestilling</th>
-			<th>Total</th>
-			{% if admin%}
-				<th>Admin</th>
-			{% endif %}
-		</tr>
-	</thread>
-
-<tbody>
-{% for order in orders %}
-	<tr>
-		<td>{{ order.user }}</td>
-		
-		<td>
-			{% if order.items %}
-				{% for item, amount in order.items.items() %}
-					{% if amount > 0 %}
-						{{ item }}: {{ amount }}<br>
-					{% endif %}
-				{% endfor %}
-			{% else %}
-				<em>Ingen varer</em>
-			{% endif %}
-		</td>
-		
-		<td>{{ order.total }} kr</td>
-		
-		{% if admin %}
-		<td>
-			<a href="/admin/block/{{ order.user_id }}"
-				onclick="Return confirm('Blocker bruger?')">
-					🚫 Block
-                </a>
-                <br>
-                <a href="/admin/unblock/{{ order.user_id }}"
-                   onclick="return confirm('Fjern blokering?')">
-                    ✅ Unblock
-                </a>
-            </td>
+    <!-- HEADER -->
+    <header class="card header-card">
+        <div class="header-left">
+            {% if user.avatar %}
+                <img
+                    src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png"
+                    alt="avatar"
+                    class="avatar"
+                >
             {% endif %}
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
+            <div>
+                <h1>📦 {{ name }}</h1>
+                <p class="muted">
+                    Logget ind som <strong>{{ user.name }}</strong>
+                    {% if admin %}<span class="admin-badge">ADMIN</span>{% endif %}
+                </p>
+            </div>
+        </div>
 
-<p style="margin-top:20px;">
-    <strong>Samlet total:</strong> {{ total }} kr
-</p>
+        <div class="header-actions">
+            <a href="/" class="btn secondary">⬅ Oversigt</a>
+        </div>
+    </header>
 
-{% if admin %}
-<hr>
-<section>
-    <h2>🛠 Admin funktioner</h2>
-    <ul>
-        <li><a href="/admin/audit">📜 Se audit log</a></li>
-        <li><a href="/open_session">➕ Åbn ny bestilling</a></li>
-        <li><a href="/close_session">🔒 Luk aktiv bestilling</a></li>
-    </ul>
-</section>
-{% endif %}
+    <!-- ORDERS -->
+    <section class="card">
+        <h2>🧾 Bestillinger</h2>
+
+        <table class="orders-table">
+            <thead>
+                <tr>
+                    <th>Bruger</th>
+                    <th>Bestilling</th>
+                    <th>Total</th>
+                    {% if admin %}
+                        <th>Admin</th>
+                    {% endif %}
+                </tr>
+            </thead>
+
+            <tbody>
+            {% for order in orders %}
+                <tr>
+                    <td>
+                        <strong>{{ order.user }}</strong>
+                    </td>
+
+                    <td>
+                        {% if order.items %}
+                            {% for item, amount in order.items.items() %}
+                                {% if amount > 0 %}
+                                    <div class="item-line">
+                                        <span>{{ item }}</span>
+                                        <span class="amount">× {{ amount }}</span>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <span class="muted">Ingen varer</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <strong>{{ order.total }} kr</strong>
+                    </td>
+
+                    {% if admin %}
+                    <td class="admin-actions">
+                        <a
+                            href="/admin/block/{{ order.user_id }}"
+                            class="btn danger small"
+                            onclick="return confirm('Bloker bruger fra web-panelet?')"
+                        >
+                            🚫 Block
+                        </a>
+
+                        <a
+                            href="/admin/unblock/{{ order.user_id }}"
+                            class="btn success small"
+                            onclick="return confirm('Fjern blokering?')"
+                        >
+                            ✅ Unblock
+                        </a>
+                    </td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="total-box">
+            <span>Samlet total</span>
+            <strong>{{ total }} kr</strong>
+        </div>
+    </section>
+
+    <!-- ADMIN PANEL -->
+    {% if admin %}
+    <section class="card admin-card">
+        <h2>🛠 Admin</h2>
+
+        <div class="admin-buttons">
+            <a href="/open_session" class="btn primary">➕ Åbn ny bestilling</a>
+            <a href="/close_session" class="btn warning">🔒 Luk bestilling</a>
+            <a href="/admin/audit" class="btn secondary">📜 Audit log</a>
+        </div>
+    </section>
+    {% endif %}
+
+</div>
 
 </body>
 </html>
