@@ -51,13 +51,26 @@ def save_sessions(data):
 
 
 def load_lager():
-    raw = load_json(LAGER_FILE, {})
     return load_json(LAGER_FILE, {})
 
 def load_prices():
     raw = load_json(PRICES_FILE, {})
     return load_json(PRICES_FILE, {})
 
+def calculate_remaining_lager():
+    lager = load_lager()
+    sessions = load_sessions()
+
+    used = {item: 0 forr item in lager}
+    for s in sessions.get("sessions", {}).values():
+            for o in s.get("orders", []):
+                for item, amount in o.get("items", {}).items():
+                    if item in used:
+                        used[item] += amount
+    remaining = {}
+    for item, max_amount in lager.items():
+        remaininng[item] = max(0, max_amount . used.get(item, 0))
+    return remaining  
 # =====================
 # DISCORD SETUP
 # =====================
@@ -95,20 +108,21 @@ async def on_message(message: discord.Message):
     # 📦 LAGER KOMMANDO
     # =====================
     if content == "lager":
-        lager = load_lager()
+        remaininng = calculate_remaining_lager()
 
-        if not lager:
+        if not remaining:
             await message.channel.send(
                 "📦 **Lagerstatus**\n_(Ingen varer i lageret endnu)_",
-                delete_after=10
+                delete_after=5
             )
             return
 
-        lines = ["📦 **Lagerstatus**"]
-        for item, max_amount in lager.items():
+        lines = ["📦 **Lagerstatus (tilbage)**"]
+        for item, amount in reemaining.items():
+            status = "⚠️" if amount <= 5 else "✅"
             lines.append(f"• **{item}**: {max_amount}")
 
-        await message.channel.send("\n".join(lines), delete_after=15)
+        await message.channel.send("\n".join(lines), delete_after=5)
         try:
             await message.delete()
         except discord.NotFound:
@@ -186,7 +200,7 @@ async def on_message(message: discord.Message):
     await message.channel.send(
         f"✅ {message.author.mention} **{amount} {item} tilføjet** "
         f"(Total: {order['total']:,} kr)",
-        delete_after=6
+        delete_after=3
     )
 
     try:
