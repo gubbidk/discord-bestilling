@@ -33,33 +33,11 @@ OAUTH_REDIRECT = "/auth/callback"
 # =====================
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "dev-secret")
-
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # =====================
-# HJÆLPERE
+# JSON HELPERS
 # =====================
-
-def get_session_lager_status(session_name):
-    data = normalize(load_session())
-    session = data["sessions"].get(session_name, {})
-    orders = session.get("orders", [])
-
-    lager = load_lager()
-    used = {}
-    for o in orders:
-        for item, amount in o.get("items", {}).items():
-            used[item] = used.get(item, 0) + amount
-
-    status = {}
-    for item, max_mount in lager.items():
-        status[item] = {
-                "used": used.get(item, 0),
-                "left": max(0, max_amount - used.get(item, 0)),
-                "max": max_amount
-        }
-    return status
-
 def load_json(path, default):
     if not os.path.exists(path):
         return default
@@ -70,20 +48,21 @@ def save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
+# =====================
+# DATA LOADERS
+# =====================
 def load_sessions():
-    return load_json(SESSIONS_FILE, {"current": None, "sessions": {}})
-
-def save_sessions(data):
-    save_json(SESSIONS_FILE, data)
-    socketio.emit("update")
-
-def normalize(data):
+    data = load_json(SESSIONS_FILE, {"current": None, "sessions": {}})
     data.setdefault("current", None)
     data.setdefault("sessions", {})
     for s in data["sessions"].values():
         s.setdefault("open", False)
         s.setdefault("orders", [])
     return data
+
+def save_sessions(data):
+    save_json(SESSIONS_FILE, data)
+    socketio.emit("update")
 
 def load_access():
     data = load_json(ACCESS_FILE, {"blocked": [], "users": {}})
@@ -94,25 +73,23 @@ def load_access():
 def save_access(data):
     save_json(ACCESS_FILE, data)
 
-def is_blocked(discord_id):
-    return discord_id in load_access().get("blocked", [])
+def load_lager():
+    return load_json(LAGER_FILE, {})
 
-@app.before_request
-def enforce_blocked_users():
-    if "user" not in session:
-        return
-
-    uid = session["user"].get("id")
-    if not uid:
-        return
-
-    if is_blocked(uid):
-        session.clear()
-        return redirect("/login")
-
+def load_prices():
+    return load_json(PRICES_FILE, {})
 
 def load_audit():
     return load_json(AUDIT_FILE, {"events": []})
+
+# =====================
+# HELPERS
+# =====================
+def is_admin():
+    return session.get("admin", False)
+
+def is_blocked(uid):
+    return uid in load_access().get("blocked", [])
 
 def audit_log(action, admin, target):
     data = load_audit()
@@ -124,31 +101,19 @@ def audit_log(action, admin, target):
     })
     save_json(AUDIT_FILE, data)
 
-def load_lager():
-    return load_json(LAGER_FILE, {})
-
-def load_prices():
-    return load_json(PRICES_FILE, {})
-
-def get_active_session_orders():
-    data = normalize(load_sessions())
-    current = data.get("current")
-    if not current:
-        return []
-    return data["sessions"].get(current, {}).get("orders", [])
-
+# =====================
+# DEDIKERET LAGER (PR SESSION)
+# =====================
 def get_lager_status_for_session(session_name):
-    data = normalize(load_sessions())
+    data = load_sessions()
     session_data = data["sessions"].get(session_name)
-
     if not session_data:
         return {}
 
-    orders = session_data.get("orders", [])
+    orders = session_data["orders"]
     lager = load_lager()
 
     used = {item: 0 for item in lager}
-
     for o in orders:
         for item, amount in o.get("items", {}).items():
             if item in used:
@@ -156,15 +121,9 @@ def get_lager_status_for_session(session_name):
 
     status = {}
     for item, max_amount in lager.items():
-        left = max(0, max_amount - used.get(item, 0))
+        left = max(0, max_amount - used[item])
         pct = 0 if max_amount == 0 else left / max_amount
-
-        if left <= 0:
-            level = "danger"
-        elif pct < 0.3:
-            level = "warning"
-        else:
-            level = "ok"
+        level = "danger" if left <= 0 else "warning" if pct < 0.3 else "ok"
 
         status[item] = {
             "left": left,
@@ -174,64 +133,17 @@ def get_lager_status_for_session(session_name):
 
     return status
 
-
-
-    # brugt lager KUN for denne session
-    used = {item: 0 for item in lager}
-
-    for o in session_orders:
-        for item, amount in o.get("items", {}).items():
-            if item in used:
-                used[item] += amount
-
-    status = {}
-    for item, max_amount in lager.items():
-        left = max_amount - used.get(item, 0)
-        pct = 0 if max_amount == 0 else left / max_amount
-
-        if left <= 0:
-            level = "danger"
-        elif pct < 0.3:
-            level = "warning"
-        else:
-            level = "ok"
-
-        status[item] = {
-            "left": left,
-            "max": max_amount,
-            "level": level
-        }
-
-    return status
-
-
-    for o in session_orders:
-        for item, amount in o.get("items", {}).items():
-            used[item] = used.get(item, 0) + amount
-
-    status = {}
-    for item, max_amount in lager.items():
-        left = max_amount - used.get(item, 0)
-        pct = 0 if max_amount == 0 else left / max_amount
-
-        if left <= 0:
-            level = "danger"
-        elif pct < 0.3:
-            level = "warning"
-        else:
-            level = "ok"
-
-        status[item] = {
-            "left": left,
-            "max": max_amount,
-            "level": level
-        }
-
-    return status
-
-def is_admin():
-    return session.get("admin", False)
-
+# =====================
+# BLOCK-ENFORCEMENT
+# =====================
+@app.before_request
+def enforce_blocked_users():
+    if "user" not in session:
+        return
+    uid = session["user"].get("id")
+    if uid and is_blocked(uid):
+        session.clear()
+        return redirect("/login")
 
 # =====================
 # AUTH
@@ -276,34 +188,24 @@ def auth_callback():
     )
 
     if member.status_code != 200:
-        return "Ikke medlem af Discord-serveren", 403
+        return "Ikke medlem af serveren", 403
 
     if is_blocked(user["id"]):
-        return "Du er blokeret fra web-panelet", 403
+        return "Blokeret", 403
 
     roles = member.json().get("roles", [])
     resp = requests.get(
         f"https://discord.com/api/guilds/{DISCORD_GUILD_ID}/roles",
         headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"}
-)
+    )
 
     if resp.status_code != 200:
-        print("⚠️ Kunne ikke hente roller fra Discord:", resp.text)
-        return "Fejl ved hentning af Discord-roller", 500
+        return "Discord rolle-fejl", 500
 
-    guild_roles = resp.json()
-
-# Ekstra sikkerhed
-    if not isinstance(guild_roles, list):
-        print("⚠️ Uventet svar fra Discord:", guild_roles)
-        return "Discord API fejl (roller)", 500
-
-    role_map = {r["id"]: r["name"] for r in guild_roles}
-
+    role_map = {r["id"]: r["name"] for r in resp.json()}
 
     admin = False
     access_ok = False
-
     for r in roles:
         name = role_map.get(r)
         if name == DISCORD_ADMIN_ROLE:
@@ -323,16 +225,13 @@ def auth_callback():
     session["admin"] = admin
 
     access = load_access()
-    uid = user["id"]
-
-    access["users"][uid] = {
+    access["users"][user["id"]] = {
         "name": user["username"],
-        "first_seen": access["users"].get(uid, {}).get(
-            "first_seen",
-            datetime.now().strftime("%d-%m-%Y %H:%M")
+        "role": "admin" if admin else "user",
+        "first_seen": access["users"].get(user["id"], {}).get(
+            "first_seen", datetime.now().strftime("%d-%m-%Y %H:%M")
         ),
-        "last_seen": datetime.now().strftime("%d-%m-%Y %H:%M"),
-        "role": "admin" if admin else "user"
+        "last_seen": datetime.now().strftime("%d-%m-%Y %H:%M")
     }
     save_access(access)
 
@@ -346,9 +245,9 @@ def index():
     if "user" not in session:
         return redirect("/login")
 
-    data = normalize(load_sessions())
+    data = load_sessions()
     totals = {
-        name: sum(o.get("total", 0) for o in s.get("orders", []))
+        name: sum(o.get("total", 0) for o in s["orders"])
         for name, s in data["sessions"].items()
     }
 
@@ -366,8 +265,7 @@ def view_session(name):
     if "user" not in session:
         return redirect("/login")
 
-    data = normalize(load_sessions())
-
+    data = load_sessions()
     if name not in data["sessions"]:
         return "Findes ikke", 404
 
@@ -385,16 +283,13 @@ def view_session(name):
         user=session["user"]
     )
 
-
-
 @app.route("/open_session")
 def open_session():
     if not is_admin():
         return "Forbidden", 403
 
-    data = normalize(load_sessions())
-
-    if data.get("current"):
+    data = load_sessions()
+    if data["current"]:
         data["sessions"][data["current"]]["open"] = False
 
     i = 1
@@ -407,7 +302,6 @@ def open_session():
 
     save_sessions(data)
     audit_log("open_session", session["user"]["name"], name)
-
     return redirect("/")
 
 @app.route("/close_session")
@@ -415,35 +309,155 @@ def close_session():
     if not is_admin():
         return "Forbidden", 403
 
-    data = normalize(load_sessions())
-    if not data.get("current"):
-        return redirect("/")
-
-    name = data["current"]
-    data["sessions"][name]["open"] = False
-    data["current"] = None
-
-    save_sessions(data)
-    audit_log("close_session", session["user"]["name"], name)
+    data = load_sessions()
+    if data["current"]:
+        name = data["current"]
+        data["sessions"][name]["open"] = False
+        data["current"] = None
+        save_sessions(data)
+        audit_log("close_session", session["user"]["name"], name)
 
     return redirect("/")
+
+@app.route("/delete_order/<session_name>/<order_id>")
+def delete_order(session_name, order_id):
+    if not is_admin():
+        return "Forbidden", 403
+
+    data = load_sessions()
+    session_data = data["sessions"].get(session_name)
+    if not session_data:
+        return "Session not found", 404
+
+    orders = session_data.get("orders", [])
+
+    order = next((o for o in orders if o["id"] == order_id), None)
+    if not order:
+        return "Order not found", 404
+
+    # 🔁 Snapshot af items (bruges til audit)
+    returned_items = {
+        item: amount
+        for item, amount in order.get("items", {}).items()
+        if amount > 0
+    }
+
+    # ❌ Fjern ordren
+    session_data["orders"] = [
+        o for o in orders if o["id"] != order_id
+    ]
+
+    save_sessions(data)
+
+    # 🧾 Audit
+    if returned_items:
+        details = "Returneret til lager:\n- " + "\n- ".join(
+            f"{k}: {v}" for k, v in returned_items.items()
+        )
+    else:
+        details = "Ingen varer i ordren"
+
+    audit_log(
+        "delete_order",
+        session["user"]["name"],
+        f"{session_name}:{order_id}\n{details}"
+    )
+
+    return redirect(f"/session/{session_name}")
+
+@app.route("/edit_order/<session_name>/<order_id>", methods=["GET", "POST"])
+def edit_order(session_name, order_id):
+    if not is_admin():
+        return "Forbidden", 403
+
+    data = load_sessions()
+    session_data = data["sessions"].get(session_name)
+    if not session_data:
+        return "Session not found", 404
+
+    orders = session_data.get("orders", [])
+
+    order = next((o for o in orders if o["id"] == order_id), None)
+    if not order:
+        return "Order not found", 404
+
+    prices = load_prices()
+    lager = load_lager()
+
+    # =====================
+    # POST – GEM ÆNDRINGER
+    # =====================
+    if request.method == "POST":
+        before_items = order["items"].copy()
+
+        # 🔁 beregn brugt lager i DENNE session
+        used = {}
+        for o in orders:
+            for item, amount in o.get("items", {}).items():
+                used[item] = used.get(item, 0) + amount
+
+        total = 0
+
+        for item in order["items"]:
+            requested = int(request.form.get(item, 0))
+
+            # hvor meget er brugt af ANDRE ordrer
+            used_by_others = used.get(item, 0) - before_items.get(item, 0)
+
+            max_allowed = max(0, lager.get(item, 0) - used_by_others)
+            final_amount = min(requested, max_allowed)
+
+            order["items"][item] = final_amount
+            total += final_amount * prices.get(item, 0)
+
+        order["total"] = total
+        save_sessions(data)
+
+        # 🧾 audit
+        changes = []
+        for k in order["items"]:
+            if before_items.get(k, 0) != order["items"].get(k, 0):
+                changes.append(
+                    f"{k}: {before_items.get(k, 0)} → {order['items'][k]}"
+                )
+
+        audit_log(
+            "edit_order",
+            session["user"]["name"],
+            f"{session_name}:{order_id}\n"
+            + ("Ændringer:\n- " + "\n- ".join(changes) if changes else "Ingen ændringer")
+        )
+
+        return redirect(f"/session/{session_name}")
+
+    # =====================
+    # GET – VIS FORMULAR
+    # =====================
+    return render_template(
+        "edit_order.html",
+        session=session_name,
+        order=order,
+        prices=prices,
+        admin=True,
+        user=session["user"]
+    )
+
 
 @app.route("/delete_session/<name>")
 def delete_session(name):
     if not is_admin():
         return "Forbidden", 403
 
-    data = normalize(load_sessions())
+    data = load_sessions()
     if name not in data["sessions"]:
         return "Not found", 404
 
-    if data.get("current") == name:
+    if data["current"] == name:
         data["current"] = None
 
     del data["sessions"][name]
     save_sessions(data)
     audit_log("delete_session", session["user"]["name"], name)
-
     return redirect("/")
 
 @app.route("/admin/users")
@@ -452,53 +466,44 @@ def admin_users():
         return "Forbidden", 403
 
     access = load_access()
-
-    # Sortér: admins først, derefter users, derefter navn
     users = dict(
         sorted(
-            access.get("users", {}).items(),
-            key=lambda x: (
-                0 if x[1].get("role") == "admin" else 1,
-                x[1].get("name", "").lower()
-            )
+            access["users"].items(),
+            key=lambda x: (0 if x[1]["role"] == "admin" else 1, x[1]["name"].lower())
         )
     )
 
     return render_template(
         "admin_users.html",
         users=users,
-        blocked=access.get("blocked", []),
-        user=session["user"],
-        admin=True
+        blocked=access["blocked"],
+        admin=True,
+        user=session["user"]
     )
 
-
-@app.route("/admin/block/<discord_id>")
-def block_user(discord_id):
+@app.route("/admin/block/<uid>")
+def block_user(uid):
     if not is_admin():
         return "Forbidden", 403
 
     access = load_access()
-    if discord_id not in access["blocked"]:
-        access["blocked"].append(discord_id)
+    if uid not in access["blocked"]:
+        access["blocked"].append(uid)
         save_access(access)
-        audit_log("block", session["user"]["name"], discord_id)
-
-    if session.get("user", {}).get("id") == discord_id:
-        session.clear()
+        audit_log("block", session["user"]["name"], uid)
 
     return redirect("/admin/users")
 
-@app.route("/admin/unblock/<discord_id>")
-def unblock_user(discord_id):
+@app.route("/admin/unblock/<uid>")
+def unblock_user(uid):
     if not is_admin():
         return "Forbidden", 403
 
     access = load_access()
-    if discord_id in access["blocked"]:
-        access["blocked"].remove(discord_id)
+    if uid in access["blocked"]:
+        access["blocked"].remove(uid)
         save_access(access)
-        audit_log("unblock", session["user"]["name"], discord_id)
+        audit_log("unblock", session["user"]["name"], uid)
 
     return redirect("/admin/users")
 
@@ -514,76 +519,12 @@ def audit():
 
     return render_template("audit.html", events=events)
 
-@app.route("/edit_order/<session_name>/<order_id>", methods=["GET", "POST"])
-def edit_order(session_name, order_id):
-    if not is_admin():
-        return "Forbidden", 403
-
-    data = normalize(load_sessions())
-    session_data = data["sessions"].get(session_name)
-    if not session_data:
-        return "Session not found", 404
-
-    orders = session_data.get("orders", [])
-    order = next((o for o in orders if o["id"] == order_id), None)
-    if not order:
-        return "Order not found", 404
-
-    prices = load_prices()
-    lager = load_lager()
-
-    # ===== POST (gem ændringer) =====
-    if request.method == "POST":
-        before_items = order["items"].copy()
-
-        # 🔁 beregn brugt lager i DENNE session
-        used = {}
-        for o in orders:
-            for item, amount in o.get("items", {}).items():
-                used[item] = used.get(item, 0) + amount
-
-        total = 0
-        for item in order["items"]:
-            req = int(request.form.get(item, 0))
-
-            # hvor meget er brugt af ANDRE ordrer
-            used_by_others = used.get(item, 0) - before_items.get(item, 0)
-
-            max_allowed = max(0, lager.get(item, 0) - used_by_others)
-            final = min(req, max_allowed)
-
-            order["items"][item] = final
-            total += final * prices.get(item, 0)
-
-        order["total"] = total
-        save_sessions(data)
-
-        # 🔍 audit detaljer
-        changes = []
-        for k in order["items"]:
-            if before_items.get(k, 0) != order["items"].get(k, 0):
-                changes.append(
-                    f"{k}: {before_items.get(k, 0)} → {order['items'].get(k, 0)}"
-                )
-
-        audit_log(
-            "edit_order",
-            session["user"]["name"],
-            f"{session_name}:{order_id}\n"
-            + ("Ændringer:\n- " + "\n- ".join(changes) if changes else "Ingen ændringer")
-        )
-
-        return redirect(f"/session/{session_name}")
-
-    # ===== GET (vis formular) =====
-    return render_template(
-        "edit_order.html",
-        session=session_name,
-        order=order,
-        prices=prices,
-        admin=True,
-        user=session["user"]
-    )
+@app.route("/session_data/<name>")
+def session_data(name):
+    data = load_sessions()
+    orders = data["sessions"].get(name, {}).get("orders", [])
+    payload = json.dumps(orders, sort_keys=True)
+    return jsonify({"hash": hashlib.md5(payload.encode()).hexdigest()})
 
 # =====================
 # START
