@@ -21,7 +21,7 @@ DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
 DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID")
 DISCORD_ADMIN_ROLE = os.getenv("DISCORD_ADMIN_ROLE")
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_TOKEN")
-
+DISCORD_USER_ROLE = os.getenv("DISCORD_USER_ROLE")
 OAUTH_REDIRECT = "/auth/callback"
 
 # =====================
@@ -95,7 +95,7 @@ def login():
     }
     return redirect("https://discord.com/api/oauth2/authorize?" + urlencode(params))
 
-@@app.route("/auth/callback")
+@app.route("/auth/callback")
 def auth_callback():
     code = request.args.get("code")
     if not code:
