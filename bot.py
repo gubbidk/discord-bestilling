@@ -17,14 +17,16 @@ BESTIL_CHANNEL_ID = int(os.getenv("BESTIL_CHANNEL_ID", "0"))
 if BESTIL_CHANNEL_ID == 0:
     raise RuntimeError("BESTIL_CHANNEL_ID mangler")
 
+# =====================
+# DATA DIRECTORY (PERSISTENT)
+# =====================
 DATA_DIR = os.getenv("DATA_DIR", "/data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-DATA_DIR = "/data"
-
 SESSIONS_FILE = f"{DATA_DIR}/sessions.json"
-ACCESS_FILE   = f"{DATA_DIR}/access.json"
-AUDIT_FILE    = f"{DATA_DIR}/audit.json"
+LAGER_FILE    = f"{DATA_DIR}/lager.json"
+PRICES_FILE   = f"{DATA_DIR}/prices.json"
+
 
 # =====================
 # LOAD DATA
