@@ -251,14 +251,16 @@ def user_history():
 
     if uid:
         data = load_sessions()
-        for sname, s in data["sessions"].items():
-            for o in s["orders"]:
+
+        for session_name, session_data in data["sessions"].items():
+            for o in session_data.get("orders", []):
                 if o.get("user_id") == uid:
                     orders.append({
-                        "session": sname,
-                        "items": o["items"],
-                        "total": o["total"],
-                        "time": o["time"]
+                        "session": session_name,
+                        "items": o.get("items", {}),
+                        "total": o.get("total", 0),
+                        "time": o.get("time", ""),
+                        "order_id": o.get("id")
                     })
 
     return render_template(
@@ -268,6 +270,7 @@ def user_history():
         admin=True,
         user=session["user"]
     )
+
 
 
 @app.route("/")

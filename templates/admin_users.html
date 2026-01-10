@@ -39,22 +39,18 @@
             {{ info.last_seen }}
         </p>
 
-        <div class="actions">
+       <div class="actions">
             {% if uid in blocked %}
-                <a class="btn success"
-                   href="/admin/unblock/{{ uid }}"
-                   onclick="return confirm('Vil du fjerne blokeringen?')">
-                   🔓 Unblock
-                </a>
+                <a class="btn success" href="/admin/unblock/{{ uid }}">🔓</a>
             {% else %}
-                <a class="btn danger"
-                   href="/admin/block/{{ uid }}"
-                   onclick="return confirm('Vil du blokere denne bruger?')">
-                   ⛔ Block
-                </a>
+                <a class="btn danger" href="/admin/block/{{ uid }}">⛔</a>
             {% endif %}
-        </div>
 
+                <a class="btn blue"
+                href="/admin/user_history?uid={{ uid }}">
+                📜 Historik
+                </a>
+            </div>
     </div>
 {% endfor %}
 </div>
