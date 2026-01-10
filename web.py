@@ -101,12 +101,15 @@ def is_blocked(discord_id):
 def enforce_blocked_users():
     if "user" not in session:
         return
-    uid= session["user"].get("id")
+
+    uid = session["user"].get("id")
     if not uid:
         return
+
     if is_blocked(uid):
         session.clear()
         return redirect("/login")
+
 
 def load_audit():
     return load_json(AUDIT_FILE, {"events": []})
@@ -134,8 +137,37 @@ def get_active_session_orders():
         return []
     return data["sessions"].get(current, {}).get("orders", [])
 
-def get_lager_status(session_orders):
+def get_lager_status():
     lager = load_lager()
+    orders = get_active_session_orders()
+
+    used = {item: 0 for item in lager}
+
+    for o in orders:
+        for item, amount in o.get("items", {}).items():
+            if item in used:
+                used[item] += amount
+
+    status = {}
+    for item, max_amount in lager.items():
+        left = max(0, max_amount - used.get(item, 0))
+        pct = 0 if max_amount == 0 else left / max_amount
+
+        if left <= 0:
+            level = "danger"
+        elif pct < 0.3:
+            level = "warning"
+        else:
+            level = "ok"
+
+        status[item] = {
+            "left": left,
+            "max": max_amount,
+            "level": level
+        }
+
+    return status
+
 
     # brugt lager KUN for denne session
     used = {item: 0 for item in lager}
@@ -324,7 +356,7 @@ def view_session(name):
 
     # 🔥 KUN aktiv session påvirker lager
     active_orders = get_active_session_orders()
-    lager_status = get_lager_status(active_orders)
+    lager_status = get_lager_status()
 
     total = sum(o.get("total", 0) for o in orders)
 
