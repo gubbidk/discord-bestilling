@@ -240,6 +240,36 @@ def auth_callback():
 # =====================
 # ROUTES
 # =====================
+
+@app.route("/admin/user_history")
+def user_history():
+    if not is_admin():
+        return "Forbidden", 403
+
+    uid = request.args.get("uid")
+    orders = []
+
+    if uid:
+        data = load_sessions()
+        for sname, s in data["sessions"].items():
+            for o in s["orders"]:
+                if o.get("user_id") == uid:
+                    orders.append({
+                        "session": sname,
+                        "items": o["items"],
+                        "total": o["total"],
+                        "time": o["time"]
+                    })
+
+    return render_template(
+        "user_history.html",
+        uid=uid,
+        orders=orders,
+        admin=True,
+        user=session["user"]
+    )
+
+
 @app.route("/")
 def index():
     if "user" not in session:
@@ -297,7 +327,11 @@ def open_session():
         i += 1
 
     name = f"bestilling{i}"
-    data["sessions"][name] = {"open": True, "orders": []}
+    data["sessions"][name] = {
+    "open": True,
+    "orders": [],
+    "locked_users": []
+}
     data["current"] = name
 
     save_sessions(data)

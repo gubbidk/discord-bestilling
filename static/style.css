@@ -232,3 +232,17 @@ th, td {
     background: #ffecec;
     border: 2px solid #e74c3c;
 }
+
+
+.admin-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+.admin-panel {
+    position: fixed;
+    right: 20px;
+    top: 100px;
+    width: 260px;
+}

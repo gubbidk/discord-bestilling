@@ -42,13 +42,17 @@
 <hr>
 
 {% if admin %}
-<div class="actions">
-    <a class="btn success" href="/open_session">➕ Ny bestilling</a>
-    <a class="btn warning" href="/close_session">🔒 Luk aktiv bestilling</a>
-    <a class="btn blue" href="/admin/users">👥 Brugere</a>
-    <a class="btn" href="/admin/audit">📜 Audit</a>
-</div>
+<section class="card admin-panel">
+    <h2>🛠 Admin</h2>
+    <div class="admin-grid">
+        <a href="/open_session" class="btn green">➕ Ny bestilling</a>
+        <a href="/close_session" class="btn orange">🔒 Luk aktiv bestilling</a>
+        <a href="/admin/users" class="btn blue">👥 Brugere</a>
+        <a href="/admin/audit" class="btn purple">📜 Audit</a>
+    </div>
+</section>
 {% endif %}
+
 
 <script>
 /* Simpel real-time refresh (bevarer nuværende løsning) */

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>🕘 Brugerhistorik</h2>
+
+<form method="get">
+    <input type="text" name="uid" placeholder="Discord ID" value="{{ uid or '' }}">
+    <button class="btn blue">Søg</button>
+</form>
+
+{% if uid %}
+<hr>
+{% if orders %}
+    {% for o in orders %}
+    <div class="card">
+        <strong>{{ o.session }}</strong> – {{ o.time }}<br>
+        <ul>
+            {% for item, amount in o.items.items() %}
+                {% if amount > 0 %}
+                <li>{{ item }} × {{ amount }}</li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+        <strong>Total:</strong> {{ o.total }} kr
+    </div>
+    {% endfor %}
+{% else %}
+    <p>Ingen ordrer fundet</p>
+{% endif %}
+{% endif %}
+
+{% endblock %}

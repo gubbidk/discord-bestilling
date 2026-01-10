@@ -43,6 +43,9 @@ def load_lager():
 def load_prices():
     return load_json(PRICES_FILE, {})
 
+def is_user_locked(session_data, user_id):
+    return user_id in session_data.get("locked_users", [])
+
 # =====================
 # LAGER (KUN AKTIV SESSION)
 # =====================
@@ -85,6 +88,27 @@ async def on_message(message):
 
     data = load_sessions()
     prices = load_prices()
+# ===== ADMIN: LÅS / LÅS OP =====
+    if content.startswith("lås ") and message.mentions:
+        if not message.author.guild_permissions.administrator:
+            await message.channel.send("⛔ Kun admins kan låse brugere", delete_after=5)
+            return
+
+        target = message.mentions[0]
+        current = data.get("current")
+        if not current:
+            return
+
+        session_data = data["sessions"][current]
+        session_data.setdefault("locked_users", [])
+        uid = str(target.id)
+        if uid not in session_data["locked_users"]:
+            session_data["locked_users"].append(uid)
+            save_sessions(data)
+            await message.channel.send(f"🔒 **{target} er nu låst**", delete_after=5)
+        else:
+            await message.channel.send("ℹ️ Bruger er allerede låst", delete_after=5)
+        return
 
     # ===== LAGER KOMMANDO =====
     if content == "lager":
@@ -106,6 +130,7 @@ async def on_message(message):
         return
 
     session_data = data["sessions"][current]
+    session_data.setdefault("locked_users", [])
     if not session_data.get("open"):
         await message.channel.send("🔒 Bestillingen er lukket", delete_after=5)
         return
@@ -126,6 +151,13 @@ async def on_message(message):
         orders.append(order)
 
     # ===== PARSE INPUT =====
+    if is_user_locked(session_data, str(message.author.id)):
+        await message.channel.send(
+            "🔒 Din bestilling er låst af en admin",
+            delete_after=5
+        )
+        return
+
     parts = content.split()
 
     if len(parts) == 1:
