@@ -3,39 +3,58 @@
 
 <h2>👥 Brugere</h2>
 
-<table class="table">
-    <thead>
-        <tr>
-            <th>Bruger</th>
-            <th>Discord ID</th>
-            <th>Status</th>
-            <th>Handling</th>
-        </tr>
-    </thead>
-    <tbody>
-    {% for id, name in users.items() %}
-        <tr>
-            <td>{{ name }}</td>
-            <td>{{ id }}</td>
-            <td>
-                {% if id in blocked %}
-                    🔴 Blokeret
-                {% else %}
-                    🟢 Aktiv
-                {% endif %}
-            </td>
-            <td>
-                {% if id in blocked %}
-                    <a class="btn green" href="/admin/unblock/{{ id }}">Fjern blokering</a>
-                {% else %}
-                    <a class="btn danger"
-                       href="/admin/block/{{ id }}"
-                       onclick="return confirm('Bloker bruger?')">Bloker</a>
-                {% endif %}
-            </td>
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
+<div class="grid">
+{% for uid, info in users.items() %}
+    <div class="card">
+
+        <h3>
+            {{ info.name }}
+            {% if uid in blocked %}
+                <span title="Blokeret">⛔</span>
+            {% endif %}
+        </h3>
+
+        <p>
+            <strong>ID:</strong> {{ uid }}<br>
+            <strong>Rolle:</strong>
+            {% if info.role == "admin" %}
+                🛡️ Admin
+            {% else %}
+                👤 Bruger
+            {% endif %}
+        </p>
+
+        <p>
+            <strong>Første login:</strong><br>
+            {{ info.first_seen }}<br>
+            <strong>Sidst set:</strong><br>
+            {{ info.last_seen }}
+        </p>
+
+        <div class="actions">
+            {% if uid in blocked %}
+                <a class="btn success"
+                   href="/admin/unblock/{{ uid }}"
+                   onclick="return confirm('Vil du fjerne blokeringen?')">
+                   🔓 Unblock
+                </a>
+            {% else %}
+                <a class="btn danger"
+                   href="/admin/block/{{ uid }}"
+                   onclick="return confirm('Vil du blokere denne bruger?')">
+                   ⛔ Block
+                </a>
+            {% endif %}
+        </div>
+
+    </div>
+{% endfor %}
+</div>
+
+<hr>
+
+<div class="actions">
+    <a class="btn" href="/">⬅️ Tilbage</a>
+</div>
 
 {% endblock %}

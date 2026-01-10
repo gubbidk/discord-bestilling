@@ -17,9 +17,6 @@ ACCESS_FILE   = f"{DATA_DIR}/access.json"
 AUDIT_FILE    = f"{DATA_DIR}/audit.json"
 LAGER_FILE    = f"{DATA_DIR}/lager.json"
 PRICES_FILE   = f"{DATA_DIR}/prices.json"
-AUDIT_FILE = f"{DATA_DIR}/audit.json"
-
-ADMIN_KEY = os.getenv("ADMIN_KEY", "thomas")
 
 DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
 DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
@@ -39,16 +36,64 @@ app.secret_key = os.getenv("FLASK_SECRET", "dev-secret")
 # =====================
 # HJÆLPERE
 # =====================
+def load_json(path, default):
+    if not os.path.exists(path):
+        return default
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
-def diff_items(before, after):
-    changes = []
-    keys = set(before.keys()) | set(after.keys())
-    for k in sorted(keys):
-        b = before.get(k, 0)
-        a = after.get(k, 0)
-        if b != a:
-            changes.append(f"{k}: {b} → {a}")
-    return changes
+def save_json(path, data):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+def load_sessions():
+    return load_json(SESSIONS_FILE, {"current": None, "sessions": {}})
+
+def save_sessions(data):
+    save_json(SESSIONS_FILE, data)
+
+def normalize(data):
+    data.setdefault("current", None)
+    data.setdefault("sessions", {})
+    for s in data["sessions"].values():
+        s.setdefault("open", False)
+        s.setdefault("orders", [])
+    return data
+
+def load_access():
+    data = load_json(ACCESS_FILE, {"blocked": [], "users": {}})
+    data.setdefault("blocked", [])
+    data.setdefault("users", {})
+    return data
+
+def save_access(data):
+    save_json(ACCESS_FILE, data)
+
+def load_audit():
+    return load_json(AUDIT_FILE, {"events": []})
+
+def audit_log(action, admin, target):
+    data = load_audit()
+    data["events"].append({
+        "time": datetime.now().strftime("%d-%m-%Y %H:%M"),
+        "action": action,
+        "admin": admin,
+        "target": target
+    })
+    save_json(AUDIT_FILE, data)
+
+def load_lager():
+    return load_json(LAGER_FILE, {})
+
+def load_prices():
+    return load_json(PRICES_FILE, {})
+
+def get_active_session_orders():
+    data = normalize(load_sessions())
+    current = data.get("current")
+    if not current:
+        return []
+    return data["sessions"].get(current, {}).get("orders", [])
 
 def get_lager_status(session_orders):
     lager = load_lager()
@@ -77,88 +122,6 @@ def get_lager_status(session_orders):
         }
 
     return status
-
-
-def get_active_session_orders():
-    data = normalize(load_sessions())
-    current = data.get("current")
-    if not current:
-        return []
-    return data["sessions"].get(current, {}).get("orders", [])
-
-
-    status = {}
-    for item, max_amount in lager.items():
-        left = max_amount - used.get(item, 0)
-        pct = 0 if max_amount == 0 else left / max_amount
-
-        if left <= 0:
-            level = "danger"
-        elif pct < 0.3:
-            level = "warning"
-        else:
-            level = "ok"
-
-        status[item] = {
-            "left": left,
-            "max": max_amount,
-            "level": level
-        }
-
-    return status
-
-
-def load_json(path, default):
-    if not os.path.exists(path):
-        return default
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def save_json(path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
-def load_sessions():
-    return load_json(SESSIONS_FILE, {"current": None, "sessions": {}})
-
-def save_sessions(data):
-    save_json(SESSIONS_FILE, data)
-
-def normalize(data):
-    data.setdefault("current", None)
-    data.setdefault("sessions", {})
-    for s in data["sessions"].values():
-        s.setdefault("open", False)
-        s.setdefault("orders", [])
-    return data
-
-def load_access():
-    return load_json(ACCESS_FILE, {"blocked": []})
-
-def save_access(data):
-    save_json(ACCESS_FILE, data)
-
-def load_audit():
-    return load_json(AUDIT_FILE, {"events": []})
-
-def save_audit():
-    save_json(AUDIT_FILE, data)
-
-def audit_log(action, admin, target):
-    data = load_audit()
-    data["events"].append({
-        "time": datetime.now().strftime("%d-%m-%Y %H:%M"),
-        "action": action,
-        "admin": admin,
-        "target": target
-    })
-    save_json(AUDIT_FILE, data)
-
-def load_lager():
-    return load_json(LAGER_FILE, {})
-
-def load_prices():
-    return load_json(PRICES_FILE, {})
 
 def is_admin():
     return session.get("admin", False)
@@ -201,21 +164,20 @@ def auth_callback():
         return "OAuth failed", 403
 
     headers = {"Authorization": f"Bearer {token}"}
-
     user = requests.get("https://discord.com/api/users/@me", headers=headers).json()
+
     member = requests.get(
         f"https://discord.com/api/users/@me/guilds/{DISCORD_GUILD_ID}/member",
         headers=headers
     )
 
     if member.status_code != 200:
-        return "Du er ikke medlem af Discord-serveren", 403
+        return "Ikke medlem af Discord-serveren", 403
 
     if is_blocked(user["id"]):
         return "Du er blokeret fra web-panelet", 403
 
     roles = member.json().get("roles", [])
-
     guild_roles = requests.get(
         f"https://discord.com/api/guilds/{DISCORD_GUILD_ID}/roles",
         headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"}
@@ -224,25 +186,41 @@ def auth_callback():
     role_map = {r["id"]: r["name"] for r in guild_roles}
 
     admin = False
-    access = False
+    access_ok = False
 
     for r in roles:
         name = role_map.get(r)
         if name == DISCORD_ADMIN_ROLE:
             admin = True
-            access = True
+            access_ok = True
         if name == DISCORD_USER_ROLE:
-            access = True
+            access_ok = True
 
-    if not access:
-        return "Ingen adgang til web-panelet", 403
+    if not access_ok:
+        return "Ingen adgang", 403
 
+    # Flask session
     session["user"] = {
         "id": user["id"],
         "name": user["username"],
         "avatar": user.get("avatar")
     }
     session["admin"] = admin
+
+    # Gem kendt bruger
+    access = load_access()
+    uid = user["id"]
+
+    access["users"][uid] = {
+        "name": user["username"],
+        "first_seen": access["users"].get(uid, {}).get(
+            "first_seen",
+            datetime.now().strftime("%d-%m-%Y %H:%M")
+        ),
+        "last_seen": datetime.now().strftime("%d-%m-%Y %H:%M"),
+        "role": "admin" if admin else "user"
+    }
+    save_access(access)
 
     return redirect("/")
 
@@ -255,7 +233,6 @@ def index():
         return redirect("/login")
 
     data = normalize(load_sessions())
-
     totals = {
         name: sum(o.get("total", 0) for o in s.get("orders", []))
         for name, s in data["sessions"].items()
@@ -276,17 +253,12 @@ def view_session(name):
         return redirect("/login")
 
     data = normalize(load_sessions())
-
     if name not in data["sessions"]:
         return "Findes ikke", 404
 
     orders = data["sessions"][name]["orders"]
-
-# ===== LAGERSTATUS (kun aktiv session) =====
     active_orders = get_active_session_orders()
     lager_status = get_lager_status(active_orders)
-
-
     total = sum(o.get("total", 0) for o in orders)
 
     return render_template(
@@ -294,116 +266,10 @@ def view_session(name):
         name=name,
         orders=orders,
         total=total,
-        lager_status=lager_status,   # ✅ VIGTIG
+        lager_status=lager_status,
         admin=is_admin(),
         user=session["user"]
     )
-
-
-@app.route("/edit_order/<session_name>/<order_id>", methods=["GET", "POST"])
-def edit_order(session_name, order_id):
-    if not is_admin():
-        return "Forbidden", 403
-
-    data = normalize(load_sessions())
-    s = data["sessions"].get(session_name)
-    if not s:
-        return "Not found", 404
-
-    order = next((o for o in s["orders"] if o["id"] == order_id), None)
-    if not order:
-        return "Order not found", 404
-
-    lager = load_lager()
-    prices = load_prices()
-
-    if request.method == "POST":
-        before_items = order["items"].copy()   # ⬅️ snapshot før
-
-        total = 0
-        for item in order["items"]:
-            req = int(request.form.get(item, 0))
-            used = sum(
-                o["items"].get(item, 0)
-                for o in s["orders"]
-                if o["id"] != order_id
-            )
-            max_allowed = max(0, lager.get(item, 0) - used)
-            final = min(req, max_allowed)
-            order["items"][item] = final
-            total += final * prices.get(item, 0)
-
-        order["total"] = total
-        save_sessions(data)
-
-        # 🔍 find ændringer
-        changes = diff_items(before_items, order["items"])
-
-        details = (
-            "Ændringer:\n- " + "\n- ".join(changes)
-            if changes else
-            "Ingen ændringer"
-        )
-
-        audit_log(
-            "edit_order",
-            session["user"]["name"],
-            f"{session_name}:{order_id}\n{details}"
-        )
-
-        return redirect(f"/session/{session_name}")
-
-
-    return render_template(
-        "edit_order.html",
-        session=session_name,
-        order=order,
-        prices=prices,
-        admin=True,
-        user=session["user"]
-    )
-
-@app.route("/delete_order/<session_name>/<order_id>")
-def delete_order(session_name, order_id):
-    if not is_admin():
-        return "Forbidden", 403
-
-    data = normalize(load_sessions())
-    s = data["sessions"].get(session_name)
-    if not s:
-        return "Not found", 404
-
-    order = next((o for o in s["orders"] if o["id"] == order_id), None)
-    if not order:
-        return "Order not found", 404
-
-    # Snapshot af items (det der "kommer tilbage på lager")
-    returned_items = {
-        item: amount
-        for item, amount in order.get("items", {}).items()
-        if amount > 0
-    }
-
-    # Fjern ordren
-    s["orders"] = [o for o in s["orders"] if o["id"] != order_id]
-    save_sessions(data)
-
-    # Audit-log med detaljer
-    if returned_items:
-        details = "Returneret til lager:\n- " + "\n- ".join(
-            f"{k}: {v}" for k, v in returned_items.items()
-        )
-    else:
-        details = "Ingen varer i ordren"
-
-    audit_log(
-        "delete_order",
-        session["user"]["name"],
-        f"{session_name}:{order_id}\n{details}"
-    )
-
-    return redirect(f"/session/{session_name}")
-
 
 @app.route("/open_session")
 def open_session():
@@ -412,62 +278,53 @@ def open_session():
 
     data = normalize(load_sessions())
 
-    # Luk evt. eksisterende session
     if data.get("current"):
         data["sessions"][data["current"]]["open"] = False
 
-    # Find nyt sessionsnavn
     i = 1
     while f"bestilling{i}" in data["sessions"]:
         i += 1
 
     name = f"bestilling{i}"
-    data["sessions"][name] = {
-        "open": True,
-        "orders": []
-    }
-
-    # 🔁 NY aktiv session → lager resetter automatisk
+    data["sessions"][name] = {"open": True, "orders": []}
     data["current"] = name
 
     save_sessions(data)
-
-    audit_log(
-        "open_session",
-        session["user"]["name"],
-        name
-    )
+    audit_log("open_session", session["user"]["name"], name)
 
     return redirect("/")
 
-
-@app.route("/delete_session/<session_name>")
-def delete_session(session_name):
+@app.route("/delete_session/<name>")
+def delete_session(name):
     if not is_admin():
         return "Forbidden", 403
 
     data = normalize(load_sessions())
-
-    if session_name not in data["sessions"]:
+    if name not in data["sessions"]:
         return "Not found", 404
 
-    # Hvis den slettede session er den aktive → nulstil current
-    if data.get("current") == session_name:
+    if data.get("current") == name:
         data["current"] = None
 
-    # Fjern sessionen
-    del data["sessions"][session_name]
+    del data["sessions"][name]
     save_sessions(data)
-
-    # Audit log
-    audit_log(
-        "delete_session",
-        session["user"]["name"],
-        session_name
-    )
+    audit_log("delete_session", session["user"]["name"], name)
 
     return redirect("/")
 
+@app.route("/admin/users")
+def admin_users():
+    if not is_admin():
+        return "Forbidden", 403
+
+    access = load_access()
+    return render_template(
+        "admin_users.html",
+        users=access["users"],
+        blocked=access["blocked"],
+        user=session["user"],
+        admin=True
+    )
 
 @app.route("/admin/block/<discord_id>")
 def block_user(discord_id):
@@ -480,7 +337,7 @@ def block_user(discord_id):
         save_access(access)
         audit_log("block", session["user"]["name"], discord_id)
 
-    return redirect("/")
+    return redirect("/admin/users")
 
 @app.route("/admin/unblock/<discord_id>")
 def unblock_user(discord_id):
@@ -493,43 +350,13 @@ def unblock_user(discord_id):
         save_access(access)
         audit_log("unblock", session["user"]["name"], discord_id)
 
-    return redirect("/")
+    return redirect("/admin/users")
 
 @app.route("/admin/audit")
 def audit():
     if not is_admin():
         return "Forbidden", 403
     return render_template("audit.html", events=reversed(load_audit()["events"]))
-
-@app.route("/session_data/<name>")
-def session_data(name):
-    data = normalize(load_sessions())
-    orders = data["sessions"].get(name, {}).get("orders", [])
-    payload = json.dumps(orders, sort_keys=True)
-    return jsonify({"hash": hashlib.md5(payload.encode()).hexdigest()})
-
-@app.route("/admin/users")
-def admin_users():
-    if not is_admin():
-        return "Forbidden", 403
-
-    data = normalize(load_sessions())
-    access = load_access()
-    users = {}
-
-    for s in data["sessions"].values():
-        for o in s.get("orders", []):
-            uid = o.get("user_id")
-            if uid:
-                users[uid] = o.get("user")
-
-    return render_template(
-        "admin_users.html",
-        users=users,
-        blocked=access.get("blocked", []),
-        user=session["user"],
-        admin=True
-    )
 
 # =====================
 # START
