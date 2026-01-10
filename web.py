@@ -79,6 +79,35 @@ def get_lager_status(session_orders):
     return status
 
 
+def get_active_session_orders():
+    data = normalize(load_sessions())
+    current = data.get("current")
+    if not current:
+        return []
+    return data["sessions"].get(current, {}).get("orders", [])
+
+
+    status = {}
+    for item, max_amount in lager.items():
+        left = max_amount - used.get(item, 0)
+        pct = 0 if max_amount == 0 else left / max_amount
+
+        if left <= 0:
+            level = "danger"
+        elif pct < 0.3:
+            level = "warning"
+        else:
+            level = "ok"
+
+        status[item] = {
+            "left": left,
+            "max": max_amount,
+            "level": level
+        }
+
+    return status
+
+
 def load_json(path, default):
     if not os.path.exists(path):
         return default
@@ -253,33 +282,10 @@ def view_session(name):
 
     orders = data["sessions"][name]["orders"]
 
-    # ===== LAGERSTATUS (NY) =====
-    lager = load_lager()
+# ===== LAGERSTATUS (kun aktiv session) =====
+    active_orders = get_active_session_orders()
+    lager_status = get_lager_status(active_orders)
 
-    # brugt pr vare
-    used = {}
-    for o in orders:
-        for item, amount in o.get("items", {}).items():
-            used[item] = used.get(item, 0) + amount
-
-    lager_status = {}
-    for item, max_amount in lager.items():
-        u = used.get(item, 0)
-        left = max(0, max_amount - u)
-
-        if left <= 0:
-            level = "danger"
-        elif left <= max_amount * 0.25:
-            level = "warn"
-        else:
-            level = "ok"
-
-        lager_status[item] = {
-            "max": max_amount,
-            "used": u,
-            "left": left,
-            "level": level
-        }
 
     total = sum(o.get("total", 0) for o in orders)
 
@@ -367,12 +373,37 @@ def delete_order(session_name, order_id):
     if not s:
         return "Not found", 404
 
+    order = next((o for o in s["orders"] if o["id"] == order_id), None)
+    if not order:
+        return "Order not found", 404
+
+    # Snapshot af items (det der "kommer tilbage på lager")
+    returned_items = {
+        item: amount
+        for item, amount in order.get("items", {}).items()
+        if amount > 0
+    }
+
+    # Fjern ordren
     s["orders"] = [o for o in s["orders"] if o["id"] != order_id]
     save_sessions(data)
 
-    audit_log("delete_order", session["user"]["name"], f"{session_name}:{order_id}")
+    # Audit-log med detaljer
+    if returned_items:
+        details = "Returneret til lager:\n- " + "\n- ".join(
+            f"{k}: {v}" for k, v in returned_items.items()
+        )
+    else:
+        details = "Ingen varer i ordren"
+
+    audit_log(
+        "delete_order",
+        session["user"]["name"],
+        f"{session_name}:{order_id}\n{details}"
+    )
 
     return redirect(f"/session/{session_name}")
+
 
 @app.route("/open_session")
 def open_session():
@@ -380,32 +411,35 @@ def open_session():
         return "Forbidden", 403
 
     data = normalize(load_sessions())
-    if data["current"]:
+
+    # Luk evt. eksisterende session
+    if data.get("current"):
         data["sessions"][data["current"]]["open"] = False
 
+    # Find nyt sessionsnavn
     i = 1
     while f"bestilling{i}" in data["sessions"]:
         i += 1
 
     name = f"bestilling{i}"
-    data["sessions"][name] = {"open": True, "orders": []}
+    data["sessions"][name] = {
+        "open": True,
+        "orders": []
+    }
+
+    # 🔁 NY aktiv session → lager resetter automatisk
     data["current"] = name
 
     save_sessions(data)
-    return redirect("/")
 
-@app.route("/close_session")
-def close_session():
-    if not is_admin():
-        return "Forbidden", 403
-
-    data = normalize(load_sessions())
-    if data["current"]:
-        data["sessions"][data["current"]]["open"] = False
-        data["current"] = None
-        save_sessions(data)
+    audit_log(
+        "open_session",
+        session["user"]["name"],
+        name
+    )
 
     return redirect("/")
+
 
 @app.route("/delete_session/<session_name>")
 def delete_session(session_name):

@@ -54,26 +54,32 @@ def load_lager():
     return load_json(LAGER_FILE, {})
 
 def load_prices():
-    raw = load_json(PRICES_FILE, {})
     return load_json(PRICES_FILE, {})
+
+def get_active_session_orders():
+    data = load_sessions()
+    current = data.get("current")
+    if not current:
+        return []
+    return data.get("sessions", {}).get(current, {}).get("orders", [])
 
 def calculate_remaining_lager():
     lager = load_lager()
-    sessions = load_sessions()
+    orders = get_active_session_orders()
 
     used = {item: 0 for item in lager}
 
-    for s in sessions.get("sessions", {}).values():
-        for o in s.get("orders", []):
-            for item, amount in o.get("items", {}).items():
-                if item in used:
-                    used[item] += amount
+    for o in orders:
+        for item, amount in o.get("items", {}).items():
+            if item in used:
+                used[item] += amount
 
     remaining = {}
     for item, max_amount in lager.items():
         remaining[item] = max(0, max_amount - used.get(item, 0))
 
     return remaining
+
   
 # =====================
 # DISCORD SETUP
