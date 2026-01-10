@@ -17,6 +17,7 @@ ACCESS_FILE   = f"{DATA_DIR}/access.json"
 AUDIT_FILE    = f"{DATA_DIR}/audit.json"
 LAGER_FILE    = f"{DATA_DIR}/lager.json"
 PRICES_FILE   = f"{DATA_DIR}/prices.json"
+AUDIT_FILE = f"{DATA_DIR}/audit.json"
 
 ADMIN_KEY = os.getenv("ADMIN_KEY", "thomas")
 
@@ -38,6 +39,16 @@ app.secret_key = os.getenv("FLASK_SECRET", "dev-secret")
 # =====================
 # HJÆLPERE
 # =====================
+
+def diff_items(before, after):
+    changes = []
+    keys = set(before.keys()) | set(after.keys())
+    for k in sorted(keys):
+        b = before.get(k, 0)
+        a = after.get(k, 0)
+        if b != a:
+            changes.append(f"{k}: {b} → {a}")
+    return changes
 
 def get_lager_status(session_orders):
     lager = load_lager()
@@ -100,6 +111,9 @@ def save_access(data):
 
 def load_audit():
     return load_json(AUDIT_FILE, {"events": []})
+
+def save_audit():
+    save_jsonn(AUDIT_FILE, data)
 
 def audit_log(action, admin, target):
     data = load_audit()
@@ -298,6 +312,8 @@ def edit_order(session_name, order_id):
     prices = load_prices()
 
     if request.method == "POST":
+        before_items = order["items"].copy()   # ⬅️ snapshot før
+
         total = 0
         for item in order["items"]:
             req = int(request.form.get(item, 0))
@@ -314,9 +330,23 @@ def edit_order(session_name, order_id):
         order["total"] = total
         save_sessions(data)
 
-        audit_log("edit_order", session["user"]["name"], f"{session_name}:{order_id}")
+        # 🔍 find ændringer
+        changes = diff_items(before_items, order["items"])
+
+        details = (
+            "Ændringer:\n- " + "\n- ".join(changes)
+            if changes else
+            "Ingen ændringer"
+        )
+
+        audit_log(
+            "edit_order",
+            session["user"]["name"],
+            f"{session_name}:{order_id}\n{details}"
+        )
 
         return redirect(f"/session/{session_name}")
+
 
     return render_template(
         "edit_order.html",
