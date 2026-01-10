@@ -94,6 +94,20 @@ def load_access():
 def save_access(data):
     save_json(ACCESS_FILE, data)
 
+def is_blocked(discord_id):
+    return discord_id in load_access().get("blocked", [])
+
+@app.before_request
+def enforce_blocked_users():
+    if "user" not in session:
+        return
+    uid= sessionn["user"].get("id")
+    if not uid:
+        return
+    if is_blocked(uid):
+        session.clear()
+        return redirect("/login")
+
 def load_audit():
     return load_json(AUDIT_FILE, {"events": []})
 
@@ -179,8 +193,6 @@ def get_lager_status(session_orders):
 def is_admin():
     return session.get("admin", False)
 
-def is_blocked(discord_id):
-    return discord_id in load_access().get("blocked", [])
 
 # =====================
 # AUTH
@@ -304,12 +316,16 @@ def view_session(name):
         return redirect("/login")
 
     data = normalize(load_sessions())
+
     if name not in data["sessions"]:
         return "Findes ikke", 404
 
     orders = data["sessions"][name]["orders"]
+
+    # 🔥 KUN aktiv session påvirker lager
     active_orders = get_active_session_orders()
     lager_status = get_lager_status(active_orders)
+
     total = sum(o.get("total", 0) for o in orders)
 
     return render_template(
@@ -321,6 +337,7 @@ def view_session(name):
         admin=is_admin(),
         user=session["user"]
     )
+
 
 @app.route("/open_session")
 def open_session():
