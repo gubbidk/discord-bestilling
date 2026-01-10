@@ -122,7 +122,7 @@ async def on_message(message: discord.Message):
             return
 
         lines = ["📦 **Lagerstatus (tilbage)**"]
-        for item, amount in reemaining.items():
+        for item, amount in remaining.items():
             status = "⚠️" if amount <= 5 else "✅"
             lines.append(f"• **{item}**: {max_amount}")
 
