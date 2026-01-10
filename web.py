@@ -276,22 +276,22 @@ def auth_callback():
 
     roles = member.json().get("roles", [])
     resp = requests.get(
-    f"https://discord.com/api/guilds/{DISCORD_GUILD_ID}/roles",
-    headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"}
+        f"https://discord.com/api/guilds/{DISCORD_GUILD_ID}/roles",
+        headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"}
 )
 
-if resp.status_code != 200:
-    print("⚠️ Kunne ikke hente roller fra Discord:", resp.text)
-    return "Fejl ved hentning af Discord-roller", 500
+    if resp.status_code != 200:
+        print("⚠️ Kunne ikke hente roller fra Discord:", resp.text)
+        return "Fejl ved hentning af Discord-roller", 500
 
-guild_roles = resp.json()
+    guild_roles = resp.json()
 
 # Ekstra sikkerhed
-if not isinstance(guild_roles, list):
-    print("⚠️ Uventet svar fra Discord:", guild_roles)
-    return "Discord API fejl (roller)", 500
+    if not isinstance(guild_roles, list):
+        print("⚠️ Uventet svar fra Discord:", guild_roles)
+        return "Discord API fejl (roller)", 500
 
-role_map = {r["id"]: r["name"] for r in guild_roles}
+    role_map = {r["id"]: r["name"] for r in guild_roles}
 
 
     admin = False
