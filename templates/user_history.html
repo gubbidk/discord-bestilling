@@ -22,15 +22,15 @@
         </p>
 
         <p><strong>Samlet brugt:</strong><br>
-            {{ "{:,}".format(stats.total_spent) }} kr
+            {{ "{:,}".format(stats['total_spent']) }} kr
         </p>
 
         <p><strong>Varer købt:</strong><br>
-            {{ stats.total_items }} stk
+            {{ stats.['total_items'] }} stk
         </p>
 
         <p><strong>Mest købt:</strong><br>
-            {{ most_bought or "—" }}
+            {{ stats['most_bought'] or "—" }}
         </p>
 
         <div class="actions">
