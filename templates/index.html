@@ -3,37 +3,41 @@
 
 <h2>📋 Bestillinger</h2>
 
+<!-- User Statistics Section -->
+<div class="user-stats">
+    <div class="user-info">
+        <img src="https://cdn.discordapp.com/avatars/{{ user['id'] }}/{{ user['avatar'] }}.png" alt="Avatar" class="avatar">
+        <h3>{{ user['name'] }}</h3>
+        <p>Role: {{ stats['role'] }}</p>
+        <p>Total Spent: {{ stats['total_spent'] }} kr</p>
+        <p>Total Items: {{ stats['total_items'] }}</p>
+        <p>Most Bought Item: {{ stats['most_bought'] }}</p>
+        <p>Status: {% if stats['locked'] %} Locked {% else %} Active {% endif %}</p>
+    </div>
+</div>
+
+<!-- Display Orders/Sessions -->
 {% if sessions %}
 <div class="grid">
-{% for name, session in sessions.items() %}
-    <div class="card">
-
-        <h3>
-            {{ name }}
-            {% if not session.open %}
-                <span title="Bestilling lukket">🔒</span>
-            {% endif %}
-        </h3>
-
-        <p>
-            💰 <strong>Total:</strong>
-            {{ totals.get(name, 0) }} kr
-        </p>
-
-        <div class="actions">
-            <a class="btn" href="/session/{{ name }}">Åbn</a>
-
-            {% if admin %}
-                <a class="btn danger"
-                   href="/delete_session/{{ name }}"
-                   onclick="return confirm('Vil du slette hele bestillingen?')">
-                   ❌
-                </a>
-            {% endif %}
+    {% for name, session in sessions.items() %}
+        <div class="card">
+            <h3>
+                {{ name }}
+                {% if not session.open %}
+                    <span title="Bestilling lukket">🔒</span>
+                {% endif %}
+            </h3>
+            <p>
+                💰 <strong>Total:</strong> {{ totals.get(name, 0) }} kr
+            </p>
+            <div class="actions">
+                <a class="btn" href="/session/{{ name }}">Åbn</a>
+                {% if admin %}
+                    <a class="btn danger" href="/delete_session/{{ name }}" onclick="return confirm('Vil du slette hele bestillingen?')">❌</a>
+                {% endif %}
+            </div>
         </div>
-
-    </div>
-{% endfor %}
+    {% endfor %}
 </div>
 {% else %}
 <p>Der er ingen bestillinger endnu.</p>
@@ -50,9 +54,8 @@
 </section>
 {% endif %}
 
-
 <script>
-/* Simpel real-time refresh (bevarer nuværende løsning) */
+/* Simple real-time refresh (keeps current solution) */
 setInterval(() => {
     location.reload();
 }, 4000);
