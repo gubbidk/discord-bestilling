@@ -68,12 +68,12 @@
         <div class="grid">
         {% for o in orders %}
             <div class="card">
-                <h3>📦 {{ o.session }}</h3>
-                <p class="muted">{{ o.time }}</p>
+                <h3>📦 {{ sname }}</h3>
+                <p class="muted">{{ o.["time"] }}</p>
 
                 <ul>
                     {% if o.items is not none %}
-                        {% for item, amount in o.items.items() %}
+                        {% for item, amount in o["items"].items() %}
                             {% if amount > 0 %}
                                 <li>{{ item }} × {{ amount }}</li>
                             {% endif %}
