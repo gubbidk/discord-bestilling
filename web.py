@@ -296,10 +296,12 @@ def user_history():
 
     uid = request.args.get("uid")
     orders = []
+    user_stats = None
     grand_total = 0
 
     if uid:
         data = load_sessions()
+
         for sname, s in data["sessions"].items():
             for o in s["orders"]:
                 if o.get("user_id") == uid:
@@ -309,17 +311,35 @@ def user_history():
                         "total": o["total"],
                         "time": o["time"]
                     })
-                    grand_total += o.get("total", 0)
-    stats = get_user_statistics(uid) if uid else None
+
+        # 🔹 samlet statistik (GENBRUG DIN FUNKTION)
+        stats = get_user_statistics(uid)
+        if stats:
+            user_stats = {
+                "id": uid,
+                "name": stats["name"],
+                "role": stats["role"],
+                "total_spent": stats["total_spent"],
+                "total_items": stats["total_items"],
+                "most_bought": stats["most_bought"],
+                "avatar": load_access()["users"].get(uid, {}).get("avatar")
+            }
+            grand_total = stats["total_spent"]
+
+    access = load_access()
+
     return render_template(
         "user_history.html",
         uid=uid,
+        user_stats=user_stats,
         orders=orders,
-        stats=stats,
+        blocked=access.get("blocked", []),
         grand_total=grand_total,
         admin=True,
         user=session["user"]
     )
+
+
 
 @app.route("/admin/lock/<uid>")
 def admin_lock_user(uid):

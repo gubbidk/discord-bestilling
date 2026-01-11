@@ -1,18 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
-{% if stats %}
+
+{% if user_stats %}
 <div class="user-stats">
 
     <div class="avatar">
-        <img src="https://cdn.discordapp.com/avatars/{{ uid }}/{{ user.avatar }}.png"
+        <img src="https://cdn.discordapp.com/avatars/{{ user_stats.id }}/{{ user_stats.avatar }}.png"
              onerror="this.src='/static/default_avatar.png'">
     </div>
 
-    <h3>{{ stats.name }}</h3>
+    <h3>{{ user_stats.name }}</h3>
 
     <div class="stats-box">
         <p><strong>Rolle:</strong>
-            {% if stats.role == "admin" %}
+            {% if user_stats.role == "admin" %}
                 🛡️ Admin
             {% else %}
                 👤 Bruger
@@ -20,22 +21,22 @@
         </p>
 
         <p><strong>Samlet brugt:</strong><br>
-            {{ "{:,}".format(stats.total_spent) }} kr
+            {{ "{:,}".format(user_stats.total_spent) }} kr
         </p>
 
         <p><strong>Varer købt:</strong><br>
-            {{ stats.total_items }} stk
+            {{ user_stats.total_items }} stk
         </p>
 
         <p><strong>Mest købt:</strong><br>
-            {{ stats.most_bought or "—" }}
+            {{ user_stats.most_bought or "—" }}
         </p>
 
         <div class="actions">
-            {% if uid in blocked %}
-                <a class="btn success" href="/admin/unlock/{{ uid }}">🔓 Lås op</a>
+            {% if user_stats.id in blocked %}
+                <a class="btn success" href="/admin/unlock/{{ user_stats.id }}">🔓 Lås op</a>
             {% else %}
-                <a class="btn danger" href="/admin/lock/{{ uid }}">🔒 Lås</a>
+                <a class="btn danger" href="/admin/lock/{{ user_stats.id }}">🔒 Lås</a>
             {% endif %}
         </div>
     </div>
@@ -44,11 +45,13 @@
 {% endif %}
 
 <h2>📜 Brugerhistorik</h2>
+
 {% if uid %}
 <p class="muted">
     Discord ID: <strong>{{ uid }}</strong>
 </p>
 {% endif %}
+
 <form method="get" class="actions">
     <input type="text"
            name="uid"
@@ -66,11 +69,10 @@
         {% for o in orders %}
             <div class="card">
                 <h3>📦 {{ o.session }}</h3>
-
                 <p class="muted">{{ o.time }}</p>
 
                 <ul>
-                    {% for item, amount in o["items"].items() %}
+                    {% for item, amount in o.items.items() %}
                         {% if amount > 0 %}
                             <li>{{ item }} × {{ amount }}</li>
                         {% endif %}
@@ -91,9 +93,6 @@
     <p>Indtast et Discord-ID for at se historik.</p>
 {% endif %}
 
-<div class="actions">
-    <a class="btn" href="/admin/users">⬅️ Tilbage til brugere</a>
-</div>
 {% if orders %}
 <div class="card">
     <h3>💰 Samlet total</h3>
@@ -102,5 +101,9 @@
     </p>
 </div>
 {% endif %}
+
+<div class="actions">
+    <a class="btn" href="/admin/users">⬅️ Tilbage til brugere</a>
+</div>
 
 {% endblock %}
