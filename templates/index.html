@@ -10,9 +10,9 @@
         </div>
 
         <div>
-            <h3>{{ user.name }}</h3>
+            <h3>{{ user_info.name }}</h3>
             <span class="role">
-                {% if stats.role == "admin" %}
+                {% if user_info.role == "admin" %}
                     🛡️ Admin
                 {% else %}
                     👤 Bruger
@@ -29,12 +29,12 @@
 
         <div class="stat-box">
             <span class="label">📦 Varer købt</span>
-            <strong>{{ stats[total_items'] }}</strong>
+            <strong>{{ stats['total_items'] }}</strong>
         </div>
 
         <div class="stat-box">
             <span class="label">⭐ Mest købt</span>
-            <strong>{{ stats[most_bought] or "—" }}</strong>
+            <strong>{{ stats['most_bought'] or "—" }}</strong>
         </div>
 
         <div class="stat-box">
