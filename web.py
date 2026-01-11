@@ -366,6 +366,43 @@ def user_history():
         user=session["user"]
     )
 
+@app.route("/")
+def index():
+    if "user" not in session:
+        # If the user is not logged in, redirect them to the login page
+        return redirect("/login")
+
+    # If the user is logged in, proceed with fetching the session data and stats
+    data = load_sessions()
+    totals = {
+        name: sum(o.get("total", 0) for o in s["orders"])
+        for name, s in data["sessions"].items()
+    }
+
+    # Fetch user statistics for the logged-in user
+    uid = session["user"]["id"]
+    stats = get_user_statistics(uid)  # Ensure this function works properly
+
+    # If stats is None (e.g., no data found), set a default value
+    if stats is None:
+        stats = {
+            "total_spent": 0,
+            "total_items": 0,
+            "most_bought": "None",
+            "role": "user",  # Default to user role
+            "locked": False   # Default to not locked
+        }
+
+    # Render the homepage template with user data and stats
+    return render_template(
+        "index.html",
+        sessions=data["sessions"],
+        totals=totals,
+        current=data["current"],
+        admin=is_admin(),
+        user=session["user"],  # Pass user info
+        stats=stats  # Pass the stats to the template
+    )
 
 
 
@@ -414,48 +451,6 @@ def admin_unlock_user(uid):
         audit_log("unlock_user", session["user"]["name"], uid)
 
     return redirect(f"/admin/user_history?uid={uid}")
-
-
-
-@app.route("/")
-def index():
-    if "user" not in session:
-        # If the user is not logged in, redirect them to the login page
-        return redirect("/login")
-
-    # If the user is logged in, proceed with fetching the session data and stats
-    data = load_sessions()
-    totals = {
-        name: sum(o.get("total", 0) for o in s["orders"])
-        for name, s in data["sessions"].items()
-    }
-
-    # Fetch user statistics for the logged-in user
-    uid = session["user"]["id"]
-    stats = get_user_statistics(uid)  # Ensure this function works properly
-
-    # If stats is None (e.g., no data found), set a default value
-    if stats is None:
-        stats = {
-            "total_spent": 0,
-            "total_items": 0,
-            "most_bought": "None",
-            "role": "user",  # Default to user role
-            "locked": False   # Default to not locked
-        }
-
-    # Render the homepage template with user data and stats
-    return render_template(
-        "index.html",
-        sessions=data["sessions"],
-        totals=totals,
-        current=data["current"],
-        admin=is_admin(),
-        user=session["user"],  # Pass user info
-        stats=stats  # Pass the stats to the template
-    )
-
-
 
 @app.route("/session/<name>")
 def view_session(name):
