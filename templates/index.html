@@ -3,6 +3,7 @@
 
 {% if stats %}
 <section class="card stats-dashboard">
+
     <div class="stats-header">
         <div class="avatar-circle">
             <img src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png"
@@ -10,9 +11,9 @@
         </div>
 
         <div>
-            <h3>{{ user_info.name }}</h3>
+            <h3>{{ user.name }}</h3>
             <span class="role">
-                {% if user_info.role == "admin" %}
+                {% if stats.role == "admin" %}
                     🛡️ Admin
                 {% else %}
                     👤 Bruger
@@ -24,26 +25,23 @@
     <div class="stats-grid">
         <div class="stat-box">
             <span class="label">💰 Samlet brugt</span>
-            <strong>{{ "{:,}".format(stats['total_spent']) }} kr</strong>
+            <strong>{{ "{:,}".format(stats.total_spent) }} kr</strong>
         </div>
 
         <div class="stat-box">
             <span class="label">📦 Varer købt</span>
-            <strong>{{ stats['total_items'] }}</strong>
+            <strong>{{ stats.total_items }}</strong>
         </div>
 
         <div class="stat-box">
             <span class="label">⭐ Mest købt</span>
-            <strong>{{ stats['most_bought'] or "—" }}</strong>
-        </div>
-
-        <div class="stat-box">
-            <span class="label"> Status </span>
-            <strong>{ % if stats['locked'] %} Locked {% else %} Aktiv {% endif %}</strong>
+            <strong>{{ stats.most_bought or "—" }}</strong>
         </div>
     </div>
+
 </section>
 {% endif %}
+
 
 
 <h2>📋 Bestillinger</h2>
