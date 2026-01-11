@@ -327,17 +327,22 @@ def user_history():
             grand_total = stats["total_spent"]
 
     access = load_access()
-
+    locked_users = []
+    current = load_sessions().get("current")
+    if current:
+        locked_users = load_sessions()["sessions"][current].get("locked_users", [])
     return render_template(
         "user_history.html",
         uid=uid,
-        user_stats=user_stats,
         orders=orders,
-        blocked=access.get("blocked", []),
-        grand_total=grand_total,
+        stats=stats,
+        most_bought=most_bought,
+        user_info=user_info,
+        locked_users=locked_users,
         admin=True,
         user=session["user"]
-    )
+)
+
 
 
 
