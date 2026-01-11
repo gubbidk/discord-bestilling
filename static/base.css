@@ -1,0 +1,64 @@
+.user-header {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.avatar-lg {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    border: 3px solid #444;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.85em;
+}
+
+.badge.admin {
+    background: #7c2cff;
+    color: white;
+}
+
+.badge.user {
+    background: #444;
+    color: #ddd;
+}
+
+.stats-grid {
+    margin-top: 15px;
+}
+
+.stat-value {
+    font-size: 1.4em;
+    font-weight: bold;
+}
+
+.order-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.order-header {
+    display: flex;
+    justify-content: space-between;
+}
+
+.order-items {
+    list-style: none;
+    padding-left: 0;
+}
+
+.order-total {
+    text-align: right;
+    font-weight: bold;
+}
+
+.grand-total {
+    font-size: 1.6em;
+    font-weight: bold;
+}

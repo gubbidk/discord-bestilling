@@ -1,37 +1,29 @@
 {% extends "base.html" %}
 {% block content %}
-<!-- DEBUG: USER_HISTORY TEMPLATE LOADED -->
 
 {% if stats %}
-<div class="user-stats">
+<!-- ================= USER HEADER ================= -->
+<div class="card user-header">
+    <div class="user-header-left">
+        {% set avatar_url = "https://cdn.discordapp.com/avatars/" ~ uid ~ "/" ~ user.avatar ~ ".png"
+            if user and user.avatar
+            else "https://cdn.discordapp.com/embed/avatars/0.png" %}
 
-    <div class="avatar">
-        <img src="https://cdn.discordapp.com/avatars/{{ uid }}/{{ user_info.avatar or '' }}.png"
-             onerror="this.src='/static/default_avatar.png'">
+        <img class="avatar-lg" src="{{ avatar_url }}">
     </div>
 
-    <h3>{{ user_info.name }}</h3>
+    <div class="user-header-right">
+        <h2>{{ user_info.name }}</h2>
 
-    <div class="stats-box">
-        <p><strong>Rolle:</strong>
+        <span class="badge {% if user_info.role == 'admin' %}admin{% else %}user{% endif %}">
             {% if user_info.role == "admin" %}
                 🛡️ Admin
             {% else %}
                 👤 Bruger
             {% endif %}
-        </p>
+        </span>
 
-        <p><strong>Samlet brugt:</strong><br>
-            {{ "{:,}".format(stats['total_spent']) }} kr
-        </p>
-
-        <p><strong>Varer købt:</strong><br>
-            {{ stats['total_items'] }} stk
-        </p>
-
-        <p><strong>Mest købt:</strong><br>
-            {{ stats['most_bought'] or "—" }}
-        </p>
+        <p class="muted">Discord ID: {{ uid }}</p>
 
         <div class="actions">
             {% if uid in locked_users %}
@@ -42,65 +34,71 @@
         </div>
     </div>
 </div>
+
+<!-- ================= STATS ================= -->
+<div class="grid stats-grid">
+    <div class="card stat">
+        <h4>💰 Samlet brugt</h4>
+        <p class="stat-value">{{ "{:,}".format(stats.total_spent) }} kr</p>
+    </div>
+
+    <div class="card stat">
+        <h4>📦 Varer købt</h4>
+        <p class="stat-value">{{ stats.total_items }} stk</p>
+    </div>
+
+    <div class="card stat">
+        <h4>⭐ Mest købt</h4>
+        <p class="stat-value">{{ stats.most_bought or "—" }}</p>
+    </div>
+</div>
 {% endif %}
 
-<h2>📜 Brugerhistorik</h2>
+<!-- ================= SEARCH ================= -->
+<div class="card">
+    <form method="get" class="actions">
+        <input type="text"
+               name="uid"
+               placeholder="Discord ID"
+               value="{{ uid or '' }}"
+               style="min-width:300px;">
+        <button class="btn blue">🔍 Søg</button>
+    </form>
+</div>
 
-{% if uid %}
-<p class="muted">
-    Discord ID: <strong>{{ uid }}</strong>
-</p>
-{% endif %}
-
-<form method="get" class="actions">
-    <input type="text"
-           name="uid"
-           placeholder="Discord ID"
-           value="{{ uid or '' }}"
-           style="min-width:300px;">
-    <button class="btn blue">🔍 Søg</button>
-</form>
-
-<hr>
-
-{% if uid %}
-    {% if orders %}
-        <div class="grid">
-        {% for o in orders %}
-            <div class="card">
-                <h3>📦 {{ sname }}</h3>
-                <p class="muted">{{ o["time"] }}</p>
-
-                <ul>
-                    {% if o.items is not none %}
-                        {% for item, amount in o["items"].items() %}
-                            {% if amount > 0 %}
-                                <li>{{ item }} × {{ amount }}</li>
-                            {% endif %}
-                        {% endfor %}
-                    {% else %}
-                        <p>Ingen varer fundet.</p>
-                    {% endif %}
-                </ul>
-
-                <p><strong>Total:</strong> {{ "{:,}".format(o.total) }} kr</p>
-            </div>
-        {% endfor %}
-        </div>
-    {% else %}
-        <p>Ingen ordrer fundet for denne bruger.</p>
-    {% endif %}
-{% else %}
-    <p>Indtast et Discord-ID for at se historik.</p>
-{% endif %}
+<!-- ================= ORDERS ================= -->
+<h2>📜 Ordrehistorik</h2>
 
 {% if orders %}
-<div class="card">
-    <h3>💰 Samlet total</h3>
-    <p style="font-size:1.3em;">
-        {{ "{:,}".format(grand_total) }} kr
-    </p>
+<div class="grid">
+    {% for o in orders %}
+    <div class="card order-card">
+        <div class="order-header">
+            <strong>📦 {{ o.session }}</strong>
+            <span class="muted">{{ o.time }}</span>
+        </div>
+
+        <ul class="order-items">
+            {% for item, amount in o.items.items() %}
+                {% if amount > 0 %}
+                    <li>{{ item }} × {{ amount }}</li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+
+        <div class="order-total">
+            {{ "{:,}".format(o.total) }} kr
+        </div>
+    </div>
+    {% endfor %}
 </div>
+
+<div class="card total-card">
+    <h3>💰 Samlet total</h3>
+    <p class="grand-total">{{ "{:,}".format(grand_total) }} kr</p>
+</div>
+{% else %}
+<p class="muted">Ingen ordrer fundet for denne bruger.</p>
 {% endif %}
 
 <div class="actions">
