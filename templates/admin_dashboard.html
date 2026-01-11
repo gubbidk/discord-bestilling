@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>🛠 Admin dashboard</h2>
+
+<div class="grid">
+
+    <div class="card">
+        <h3>➕ Ny bestilling</h3>
+        <p>Åbn en ny aktiv bestilling</p>
+        <a class="btn green" href="/open_session">Start</a>
+    </div>
+
+    <div class="card">
+        <h3>🔒 Luk bestilling</h3>
+        <p>Luk den aktive bestilling</p>
+        <a class="btn orange" href="/close_session">Luk</a>
+    </div>
+
+    <div class="card">
+        <h3>👥 Brugere</h3>
+        <p>Administrér brugere og blokering</p>
+        <a class="btn blue" href="/admin/users">Åbn</a>
+    </div>
+
+    <div class="card">
+        <h3>📜 Audit log</h3>
+        <p>Se admin-handlinger</p>
+        <a class="btn blue" href="/admin/audit">Åbn</a>
+    </div>
+
+</div>
+
+<div class="actions">
+    <a class="btn" href="/">⬅️ Tilbage</a>
+</div>
+
+{% endblock %}

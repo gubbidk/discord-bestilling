@@ -2,7 +2,11 @@
 {% block content %}
 
 <h2>📜 Brugerhistorik</h2>
-
+{% if uid %}
+<p class="muted">
+    Discord ID: <strong>{{ uid }}</strong>
+</p>
+{% endif %}
 <form method="get" class="actions">
     <input type="text"
            name="uid"
@@ -48,5 +52,13 @@
 <div class="actions">
     <a class="btn" href="/admin/users">⬅️ Tilbage til brugere</a>
 </div>
+{% if orders %}
+<div class="card">
+    <h3>💰 Samlet total</h3>
+    <p style="font-size:1.3em;">
+        {{ "{:,}".format(grand_total) }} kr
+    </p>
+</div>
+{% endif %}
 
 {% endblock %}

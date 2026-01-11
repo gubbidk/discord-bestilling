@@ -241,6 +241,18 @@ def auth_callback():
 # ROUTES
 # =====================
 
+@app.route("/admin")
+def admin_dashboard():
+    if not is_admin():
+        return "Forbidden", 403
+
+    return render_template(
+        "admin_dashboard.html",
+        admin=True,
+        user=session["user"]
+    )
+
+
 @app.route("/admin/user_history")
 def user_history():
     if not is_admin():
@@ -248,28 +260,30 @@ def user_history():
 
     uid = request.args.get("uid")
     orders = []
+    grand_total = 0
 
     if uid:
         data = load_sessions()
-
-        for session_name, session_data in data["sessions"].items():
-            for o in session_data.get("orders", []):
+        for sname, s in data["sessions"].items():
+            for o in s["orders"]:
                 if o.get("user_id") == uid:
                     orders.append({
-                        "session": session_name,
-                        "items": o.get("items", {}),
-                        "total": o.get("total", 0),
-                        "time": o.get("time", ""),
-                        "order_id": o.get("id")
+                        "session": sname,
+                        "items": o["items"],
+                        "total": o["total"],
+                        "time": o["time"]
                     })
+                    grand_total += o.get("total", 0)
 
     return render_template(
         "user_history.html",
         uid=uid,
         orders=orders,
+        grand_total=grand_total,
         admin=True,
         user=session["user"]
     )
+
 
 
 
