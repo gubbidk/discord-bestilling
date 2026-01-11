@@ -72,11 +72,16 @@
                 <p class="muted">{{ o.time }}</p>
 
                 <ul>
-                    {% for item, amount in o.items.items() %}
-                        {% if amount > 0 %}
-                            <li>{{ item }} × {{ amount }}</li>
-                        {% endif %}
-                    {% endfor %}
+                    {% if o.items and o.items|length > 0 %}
+                        {% for item, amount in o.items.items() %}
+                            {% if amount > 0 %}
+                                <li>{{ item }} × {{ amount }}</li>
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <p>Ingen varer fundet i denne ordre.</p>
+                    {% endif %}
+
                 </ul>
 
                 <p><strong>Total:</strong> {{ "{:,}".format(o.total) }} kr</p>
