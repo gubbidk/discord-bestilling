@@ -107,11 +107,20 @@ def get_user_statistics(uid):
     if item_counter:
         most_bought = max(item_counter.items(), key=lambda x: x[1])[0]
 
+    # Return role info and lock status for the user
+    access = load_access()
+    user_info = access["users"].get(uid, {})
+    role = user_info.get("role", "user")
+    locked = uid in load_sessions().get("current", {}).get("locked_users", [])
+
     return {
         "total_spent": total_spent,
         "total_items": total_items,
-        "most_bought": most_bought
+        "most_bought": most_bought,
+        "role": role,
+        "locked": locked
     }
+
 
 
 
@@ -291,7 +300,6 @@ def user_history():
     uid = request.args.get("uid")
     orders = []
     stats = None
-    most_bought = None
     grand_total = 0
 
     if uid:
@@ -310,9 +318,8 @@ def user_history():
         stats = get_user_statistics(uid)
         if stats:
             grand_total = stats["total_spent"]
-            most_bought = stats["most_bought"]
 
-    # ✅ BRUGERINFO (SIKKER)
+    # Fetch user info from access data (including avatar)
     access = load_access()
     raw_user = access["users"].get(uid)
 
@@ -321,10 +328,10 @@ def user_history():
         user_info = {
             "name": raw_user.get("name"),
             "role": raw_user.get("role"),
-            "avatar": session["user"].get("avatar")
+            "avatar": raw_user.get("avatar")
         }
 
-    # ✅ FALLBACK STATS (så template altid virker)
+    # Fall back if no stats are found
     if not stats:
         stats = {
             "total_spent": 0,
@@ -341,13 +348,13 @@ def user_history():
         uid=uid,
         orders=orders,
         stats=stats,
-        most_bought=most_bought,
         grand_total=grand_total,
         user_info=user_info,
         locked_users=locked_users,
         admin=True,
         user=session["user"]
     )
+
 
 
 
@@ -402,22 +409,42 @@ def admin_unlock_user(uid):
 @app.route("/")
 def index():
     if "user" not in session:
+        # If the user is not logged in, redirect them to the login page
         return redirect("/login")
 
+    # If the user is logged in, proceed with fetching the session data and stats
     data = load_sessions()
     totals = {
         name: sum(o.get("total", 0) for o in s["orders"])
         for name, s in data["sessions"].items()
     }
 
+    # Fetch user statistics for the logged-in user
+    uid = session["user"]["id"]
+    stats = get_user_statistics(uid)  # Ensure this function works properly
+
+    # If stats is None (e.g., no data found), set a default value
+    if stats is None:
+        stats = {
+            "total_spent": 0,
+            "total_items": 0,
+            "most_bought": "None",
+            "role": "user",  # Default to user role
+            "locked": False   # Default to not locked
+        }
+
+    # Render the homepage template with user data and stats
     return render_template(
         "index.html",
         sessions=data["sessions"],
         totals=totals,
         current=data["current"],
         admin=is_admin(),
-        user=session["user"]
+        user=session["user"],  # Pass user info
+        stats=stats  # Pass the stats to the template
     )
+
+
 
 @app.route("/session/<name>")
 def view_session(name):
