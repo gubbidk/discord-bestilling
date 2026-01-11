@@ -107,21 +107,32 @@ def get_user_statistics(uid):
     if item_counter:
         most_bought = max(item_counter.items(), key=lambda x: x[1])[0]
 
-    # Return role info and lock status for the user
-    access = load_access()
-    user_info = access["users"].get(uid, {})
-    role = user_info.get("role", "user")
-    locked = uid in load_sessions().get("current", {}).get("locked_users", [])
+    # Ensure 'current' is a valid session and is not a string
+    current_session = data.get("sessions", {}).get(data.get("current"))
+    if current_session:
+        locked = uid in current_session.get("locked_users", [])
+    else:
+        locked = False
 
     return {
         "total_spent": total_spent,
         "total_items": total_items,
         "most_bought": most_bought,
-        "role": role,
+        "role": "user",  # Default role
         "locked": locked
     }
 
 
+
+def load_sessions():
+    data = load_json(SESSIONS_FILE, {"current": None, "sessions": {}})
+    data.setdefault("current", None)
+    data.setdefault("sessions", {})
+    for s in data["sessions"].values():
+        s.setdefault("open", False)
+        s.setdefault("orders", [])
+    print("Loaded sessions:", data)  # Debugging line to inspect the data
+    return data
 
 
 def is_admin():
