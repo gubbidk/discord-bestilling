@@ -1,23 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
 
-{# =======================
-   👤 BRUGER STATISTIK
-   ======================= #}
 {% if user_info %}
 <div class="user-stats">
 
     <div class="avatar">
         <img src="https://cdn.discordapp.com/avatars/{{ uid }}/{{ user_info.avatar or '' }}.png"
-             alt="Avatar"
              onerror="this.src='/static/default_avatar.png'">
     </div>
 
     <h3>{{ user_info.name }}</h3>
 
     <div class="stats-box">
-        <p>
-            <strong>Rolle:</strong><br>
+        <p><strong>Rolle:</strong>
             {% if user_info.role == "admin" %}
                 🛡️ Admin
             {% else %}
@@ -25,18 +20,15 @@
             {% endif %}
         </p>
 
-        <p>
-            <strong>Samlet brugt:</strong><br>
-            {{ "{:,}".format(stats["total_spent"]) }} kr
+        <p><strong>Samlet brugt:</strong><br>
+            {{ "{:,}".format(stats.total_spent) }} kr
         </p>
 
-        <p>
-            <strong>Varer købt:</strong><br>
-            {{ stats["total_items"] }} stk
+        <p><strong>Varer købt:</strong><br>
+            {{ stats.total_items }} stk
         </p>
 
-        <p>
-            <strong>Mest købt vare:</strong><br>
+        <p><strong>Mest købt:</strong><br>
             {{ most_bought or "—" }}
         </p>
 
@@ -51,11 +43,6 @@
 </div>
 {% endif %}
 
-<hr>
-
-{# =======================
-   📜 BRUGERHISTORIK
-   ======================= #}
 <h2>📜 Brugerhistorik</h2>
 
 {% if uid %}
@@ -84,17 +71,14 @@
                 <p class="muted">{{ o.time }}</p>
 
                 <ul>
-                    {% for item, amount in o["items"].items() %}
+                    {% for item, amount in o.items.items() %}
                         {% if amount > 0 %}
                             <li>{{ item }} × {{ amount }}</li>
                         {% endif %}
                     {% endfor %}
                 </ul>
 
-                <p>
-                    <strong>Total:</strong>
-                    {{ "{:,}".format(o.total) }} kr
-                </p>
+                <p><strong>Total:</strong> {{ "{:,}".format(o.total) }} kr</p>
             </div>
         {% endfor %}
         </div>
