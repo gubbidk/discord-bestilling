@@ -308,25 +308,23 @@ def user_history():
                     })
 
         stats = get_user_statistics(uid)
+        if stats:
+            grand_total = stats["total_spent"]
+            most_bought = stats["most_bought"]
 
-        grand_total = stats["total_spent"]
-        most_bought = stats["most_bought"]
-
-    # ✅ BRUGERINFO (FIX)
+    # ✅ BRUGERINFO (SIKKER)
     access = load_access()
     raw_user = access["users"].get(uid)
 
     user_info = None
-    raw_user = access["users"].get(uid)
+    if raw_user:
+        user_info = {
+            "name": raw_user.get("name"),
+            "role": raw_user.get("role"),
+            "avatar": session["user"].get("avatar")
+        }
 
-    user_info = {
-        "name": raw_user["name"] if raw_user else f"Discord bruger ({uid})",
-        "role": raw_user["role"] if raw_user else "user",
-        "avatar": session["user"].get("avatar")
-    }
-
-
-    # ✅ FALLBACK STATS (VIGTIG)
+    # ✅ FALLBACK STATS (så template altid virker)
     if not stats:
         stats = {
             "total_spent": 0,
@@ -350,6 +348,7 @@ def user_history():
         admin=True,
         user=session["user"]
     )
+
 
 
 
