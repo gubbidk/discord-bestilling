@@ -1,20 +1,52 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2>📋 Bestillinger</h2>
+{% if stats %}
+<section class="card stats-dashboard">
+    <div class="stats-header">
+        <div class="avatar-circle">
+            <img src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png"
+                 onerror="this.src='/static/default_avatar.png'">
+        </div>
 
-<!-- User Statistics Section -->
-<div class="user-stats">
-    <div class="user-info">
-        <img src="https://cdn.discordapp.com/avatars/{{ user['id'] }}/{{ user['avatar'] }}.png" alt="Avatar" class="avatar">
-        <h3>{{ user['name'] }}</h3>
-        <p>Role: {{ stats['role'] }}</p>
-        <p>Total Spent: {{ stats['total_spent'] }} kr</p>
-        <p>Total Items: {{ stats['total_items'] }}</p>
-        <p>Most Bought Item: {{ stats['most_bought'] }}</p>
-        <p>Status: {% if stats['locked'] %} Locked {% else %} Active {% endif %}</p>
+        <div>
+            <h3>{{ user.name }}</h3>
+            <span class="role">
+                {% if stats.role == "admin" %}
+                    🛡️ Admin
+                {% else %}
+                    👤 Bruger
+                {% endif %}
+            </span>
+        </div>
     </div>
-</div>
+
+    <div class="stats-grid">
+        <div class="stat-box">
+            <span class="label">💰 Samlet brugt</span>
+            <strong>{{ "{:,}".format(stats['total_spent']) }} kr</strong>
+        </div>
+
+        <div class="stat-box">
+            <span class="label">📦 Varer købt</span>
+            <strong>{{ stats[total_items'] }}</strong>
+        </div>
+
+        <div class="stat-box">
+            <span class="label">⭐ Mest købt</span>
+            <strong>{{ stats[most_bought] or "—" }}</strong>
+        </div>
+
+        <div class="stat-box">
+            <span class="label"> Status </span>
+            <strong>{ % if stats['locked'] %} Locked {% else %} Aktiv {% endif %}</strong>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+
+<h2>📋 Bestillinger</h2>
 
 <!-- Display Orders/Sessions -->
 {% if sessions %}
