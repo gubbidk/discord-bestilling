@@ -318,8 +318,24 @@ def user_history():
             grand_total = stats["total_spent"]
             most_bought = stats["most_bought"]
 
+    # ✅ BRUGERINFO (FIX)
     access = load_access()
-    user_info = access["users"].get(uid)
+    raw_user = access["users"].get(uid)
+
+    user_info = None
+    if raw_user:
+        user_info = {
+            "name": raw_user.get("name"),
+            "role": raw_user.get("role"),
+            "avatar": session["user"].get("avatar")
+        }
+
+    # ✅ FALLBACK STATS (VIGTIG)
+    if not stats:
+        stats = {
+            "total_spent": 0,
+            "total_items": 0
+        }
 
     locked_users = []
     current = load_sessions().get("current")
@@ -338,6 +354,7 @@ def user_history():
         admin=True,
         user=session["user"]
     )
+
 
 
 
