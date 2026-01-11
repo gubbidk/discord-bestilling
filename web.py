@@ -87,11 +87,6 @@ def load_audit():
 # =====================
 
 def get_user_statistics(uid):
-    access = load_access()
-    user_info = access["users"].get(uid)
-    if not user_info:
-        return None
-
     data = load_sessions()
 
     total_spent = 0
@@ -113,12 +108,11 @@ def get_user_statistics(uid):
         most_bought = max(item_counter.items(), key=lambda x: x[1])[0]
 
     return {
-        "name": user_info["name"],
-        "role": user_info["role"],
         "total_spent": total_spent,
         "total_items": total_items,
         "most_bought": most_bought
     }
+
 
 
 def is_admin():
@@ -314,21 +308,23 @@ def user_history():
                     })
 
         stats = get_user_statistics(uid)
-        if stats:
-            grand_total = stats["total_spent"]
-            most_bought = stats["most_bought"]
+
+        grand_total = stats["total_spent"]
+        most_bought = stats["most_bought"]
 
     # ✅ BRUGERINFO (FIX)
     access = load_access()
     raw_user = access["users"].get(uid)
 
     user_info = None
-    if raw_user:
-        user_info = {
-            "name": raw_user.get("name"),
-            "role": raw_user.get("role"),
-            "avatar": session["user"].get("avatar")
-        }
+    raw_user = access["users"].get(uid)
+
+    user_info = {
+        "name": raw_user["name"] if raw_user else f"Discord bruger ({uid})",
+        "role": raw_user["role"] if raw_user else "user",
+        "avatar": session["user"].get("avatar")
+    }
+
 
     # ✅ FALLBACK STATS (VIGTIG)
     if not stats:
