@@ -295,21 +295,13 @@ def user_history():
         return "Forbidden", 403
 
     uid = request.args.get("uid")
-
     orders = []
     stats = None
-    user_info = None
     most_bought = None
     grand_total = 0
 
     if uid:
         data = load_sessions()
-        access = load_access()
-
-        user_info = access["users"].get(uid)
-
-        item_counter = {}
-        total_items = 0
 
         for sname, s in data["sessions"].items():
             for o in s["orders"]:
@@ -321,24 +313,14 @@ def user_history():
                         "time": o["time"]
                     })
 
-                    grand_total += o.get("total", 0)
+        stats = get_user_statistics(uid)
+        if stats:
+            grand_total = stats["total_spent"]
+            most_bought = stats["most_bought"]
 
-                    for item, amount in o.get("items", {}).items():
-                        if amount > 0:
-                            total_items += amount
-                            if item.lower() != "veste":
-                                item_counter[item] = item_counter.get(item, 0) + amount
+    access = load_access()
+    user_info = access["users"].get(uid)
 
-        if item_counter:
-            most_bought = max(item_counter.items(), key=lambda x: x[1])[0]
-
-        if user_info:
-            stats = {
-                "total_spent": grand_total,
-                "total_items": total_items
-            }
-
-    # 🔒 låste brugere i aktiv session
     locked_users = []
     current = load_sessions().get("current")
     if current:
@@ -349,13 +331,15 @@ def user_history():
         uid=uid,
         orders=orders,
         stats=stats,
-        user_info=user_info,
         most_bought=most_bought,
-        locked_users=locked_users,
         grand_total=grand_total,
+        user_info=user_info,
+        locked_users=locked_users,
         admin=True,
         user=session["user"]
     )
+
+
 
 
 
