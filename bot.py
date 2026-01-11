@@ -89,26 +89,56 @@ async def on_message(message):
     data = load_sessions()
     prices = load_prices()
 # ===== ADMIN: LÅS / LÅS OP =====
-    if content.startswith("lås ") and message.mentions:
+    # ===== ADMIN: LÅS / LÅS OP =====
+    if (content.startswith("lås ") or content.startswith("låsop ")) and message.mentions:
         if not message.author.guild_permissions.administrator:
             await message.channel.send("⛔ Kun admins kan låse brugere", delete_after=5)
             return
 
-        target = message.mentions[0]
+        data = load_sessions()
         current = data.get("current")
         if not current:
+            await message.channel.send("❌ Ingen aktiv bestilling", delete_after=5)
             return
 
         session_data = data["sessions"][current]
         session_data.setdefault("locked_users", [])
+
+        target = message.mentions[0]
         uid = str(target.id)
-        if uid not in session_data["locked_users"]:
-            session_data["locked_users"].append(uid)
-            save_sessions(data)
-            await message.channel.send(f"🔒 **{target} er nu låst**", delete_after=5)
-        else:
-            await message.channel.send("ℹ️ Bruger er allerede låst", delete_after=5)
-        return
+
+    # 🔒 LÅS
+        if content.startswith("lås "):
+            if uid not in session_data["locked_users"]:
+                session_data["locked_users"].append(uid)
+                save_sessions(data)
+                await message.channel.send(
+                    f"🔒 **{target} er nu låst**",
+                    delete_after=5
+                )
+            else:
+                await message.channel.send(
+                    "ℹ️ Brugeren er allerede låst",
+                    delete_after=5
+                )
+            return
+
+    # 🔓 LÅS OP
+        if content.startswith("låsop "):
+            if uid in session_data["locked_users"]:
+                session_data["locked_users"].remove(uid)
+                save_sessions(data)
+                await message.channel.send(
+                    f"🔓 **{target} er nu låst op**",
+                    delete_after=5
+                )
+            else:
+                await message.channel.send(
+                    "ℹ️ Brugeren er ikke låst",
+                    delete_after=5
+                )
+            return
+
 
     # ===== LAGER KOMMANDO =====
     if content == "lager":

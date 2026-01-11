@@ -1,5 +1,47 @@
 {% extends "base.html" %}
 {% block content %}
+{% if stats %}
+<div class="user-stats">
+
+    <div class="avatar">
+        <img src="https://cdn.discordapp.com/avatars/{{ uid }}/{{ user.avatar }}.png"
+             onerror="this.src='/static/default_avatar.png'">
+    </div>
+
+    <h3>{{ stats.name }}</h3>
+
+    <div class="stats-box">
+        <p><strong>Rolle:</strong>
+            {% if stats.role == "admin" %}
+                🛡️ Admin
+            {% else %}
+                👤 Bruger
+            {% endif %}
+        </p>
+
+        <p><strong>Samlet brugt:</strong><br>
+            {{ "{:,}".format(stats.total_spent) }} kr
+        </p>
+
+        <p><strong>Varer købt:</strong><br>
+            {{ stats.total_items }} stk
+        </p>
+
+        <p><strong>Mest købt:</strong><br>
+            {{ stats.most_bought or "—" }}
+        </p>
+
+        <div class="actions">
+            {% if uid in blocked %}
+                <a class="btn success" href="/admin/unlock/{{ uid }}">🔓 Lås op</a>
+            {% else %}
+                <a class="btn danger" href="/admin/lock/{{ uid }}">🔒 Lås</a>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endif %}
 
 <h2>📜 Brugerhistorik</h2>
 {% if uid %}

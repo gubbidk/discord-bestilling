@@ -85,6 +85,42 @@ def load_audit():
 # =====================
 # HELPERS
 # =====================
+
+def get_user_statistics(uid):
+    access = load_access()
+    user_info = access["users"].get(uid)
+    if not user_info:
+        return None
+
+    data = load_sessions()
+
+    total_spent = 0
+    total_items = 0
+    item_counter = {}
+
+    for s in data["sessions"].values():
+        for o in s["orders"]:
+            if o.get("user_id") == uid:
+                total_spent += o.get("total", 0)
+
+                for item, amount in o.get("items", {}).items():
+                    total_items += amount
+                    if item.lower() != "veste":
+                        item_counter[item] = item_counter.get(item, 0) + amount
+
+    most_bought = None
+    if item_counter:
+        most_bought = max(item_counter.items(), key=lambda x: x[1])[0]
+
+    return {
+        "name": user_info["name"],
+        "role": user_info["role"],
+        "total_spent": total_spent,
+        "total_items": total_items,
+        "most_bought": most_bought
+    }
+
+
 def is_admin():
     return session.get("admin", False)
 
@@ -274,16 +310,57 @@ def user_history():
                         "time": o["time"]
                     })
                     grand_total += o.get("total", 0)
-
+    stats = get_user_statistics(uid) if uid else None
     return render_template(
         "user_history.html",
         uid=uid,
         orders=orders,
+        stats=stats,
         grand_total=grand_total,
         admin=True,
         user=session["user"]
     )
 
+@app.route("/admin/lock/<uid>")
+def admin_lock_user(uid):
+    if not is_admin():
+        return "Forbidden", 403
+
+    data = load_sessions()
+    current = data.get("current")
+    if not current:
+        return redirect("/admin/users")
+
+    session_data = data["sessions"][current]
+    session_data.setdefault("locked_users", [])
+
+    if uid not in session_data["locked_users"]:
+        session_data["locked_users"].append(uid)
+        save_sessions(data)
+        audit_log("lock_user", session["user"]["name"], uid)
+
+    return redirect(f"/admin/user_history?uid={uid}")
+
+
+@app.route("/admin/unlock/<uid>")
+def admin_unlock_user(uid):
+    if not is_admin():
+        return "Forbidden", 403
+
+    data = load_sessions()
+    current = data.get("current")
+    if not current:
+        return redirect("/admin/users")
+
+    session_data = data["sessions"][current]
+    session_data.setdefault("locked_users", [])
+
+    if uid in session_data["locked_users"]:
+        session_data["locked_users"].remove(uid)
+        save_sessions(data)
+        audit_log("unlock_user", session["user"]["name"], uid)
+
+    return redirect(f"/admin/user_history?uid={uid}")
 
 
 
