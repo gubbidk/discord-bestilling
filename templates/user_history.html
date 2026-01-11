@@ -69,7 +69,7 @@
         {% for o in orders %}
             <div class="card">
                 <h3>📦 {{ sname }}</h3>
-                <p class="muted">{{ o.["time"] }}</p>
+                <p class="muted">{{ o["time"] }}</p>
 
                 <ul>
                     {% if o.items is not none %}
