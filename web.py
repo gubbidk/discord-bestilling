@@ -55,9 +55,7 @@ def save_json(path, data):
 # =====================
 def load_sessions():
     data = load_json(SESSIONS_FILE, {"current": None, "sessions": {}})
-    data.setdefault("current", None)
-    data.setdefault("sessions", {})
-    for s in data["sessions"].values():
+    for s in data.get("sessions", {}).values():
         s.setdefault("open", False)
         s.setdefault("orders", [])
         s.setdefault("locked_users", [])
@@ -67,17 +65,8 @@ def save_sessions(data):
     save_json(SESSIONS_FILE, data)
     socketio.emit("update")
 
-def load_user_stats():
-    return load_json(STATS_FILE, {})
-
-def save_user_stats(data):
-    save_json(STATS_FILE, data)
-
 def load_access():
-    data = load_json(ACCESS_FILE, {"blocked": [], "users": {}})
-    data.setdefault("blocked", [])
-    data.setdefault("users", {})
-    return data
+    return load_json(ACCESS_FILE, {"blocked": [], "users": {}})
 
 def save_access(data):
     save_json(ACCESS_FILE, data)
@@ -101,34 +90,48 @@ def save_user_stats(data):
 # =====================
 
 def get_user_statistics(uid):
-    stats_data = load_user_stats()
-    access = load_access()
-    sessions = load_sessions()
-
-    user_stats = stats_data.get(uid, {
+    stats = load_user_stats().get(uid, {
         "total_spent": 0,
         "total_items": 0,
         "items": {}
     })
 
     most_bought = None
-    if user_stats["items"]:
-        most_bought = max(user_stats["items"].items(), key=lambda x: x[1])[0]
+    if stats["items"]:
+        most_bought = max(stats["items"].items(), key=lambda x: x[1])[0]
 
+    sessions = load_sessions()
     locked = False
-    current = sessions.get("current")
-    if current:
-        locked = uid in sessions["sessions"].get(current, {}).get("locked_users", [])
+    if sessions.get("current"):
+        locked = uid in sessions["sessions"].get(
+            sessions["current"], {}
+        ).get("locked_users", [])
 
-    role = access.get("users", {}).get(uid, {}).get("role", "user")
+    role = load_access().get("users", {}).get(uid, {}).get("role", "user")
 
     return {
-        "total_spent": user_stats["total_spent"],
-        "total_items": user_stats["total_items"],
+        "total_spent": stats["total_spent"],
+        "total_items": stats["total_items"],
         "most_bought": most_bought,
         "locked": locked,
         "role": role
     }
+
+def is_admin():
+    return session.get("admin", False)
+
+def is_blocked(uid):
+    return uid in load_access().get("blocked", [])
+
+def audit_log(action, admin, target):
+    data = load_audit()
+    data["events"].append({
+        "time": datetime.now().strftime("%d-%m-%Y %H:%M"),
+        "action": action,
+        "admin": admin,
+        "target": target
+    })
+    save_json(AUDIT_FILE, data)
 
 # =====================
 # DEDIKERET LAGER (PR SESSION)
@@ -151,12 +154,10 @@ def get_lager_status_for_session(session_name):
     for item, max_amount in lager.items():
         left = max(0, max_amount - used[item])
         pct = 0 if max_amount == 0 else left / max_amount
-        level = "danger" if left <= 0 else "warning" if pct < 0.3 else "ok"
-
         status[item] = {
             "left": left,
             "max": max_amount,
-            "level": level
+            "level": "danger" if left <= 0 else "warning" if pct < 0.3 else "ok"
         }
     return status
 
@@ -164,10 +165,8 @@ def get_lager_status_for_session(session_name):
 # BLOCK-ENFORCEMENT
 # =====================
 @app.before_request
-def enforce_blocked_users():
-    if "user" not in session:
-        return
-    if is_blocked(session["user"]["id"]):
+def enforce_blocked():
+    if "user" in session and is_blocked(session["user"]["id"]):
         session.clear()
         return redirect("/login")
 
@@ -348,8 +347,6 @@ def index():
         for name, s in data["sessions"].items()
     }
 
-    stats = get_user_statistics(session["user"]["id"])
-
     return render_template(
         "index.html",
         sessions=data["sessions"],
@@ -357,7 +354,7 @@ def index():
         current=data["current"],
         admin=is_admin(),
         user=session["user"],
-        stats=stats
+        stats=get_user_statistics(session["user"]["id"])
     )
 
 @app.route("/admin/lock/<uid>")
