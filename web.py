@@ -605,18 +605,6 @@ def edit_order(session_name, order_id):
     return redirect(f"/session/{session_name}")
 
 
-    # =====================
-    # GET – VIS FORMULAR
-    # =====================
-    return render_template(
-        "edit_order.html",
-        session=session_name,
-        order=order,
-        prices=prices,
-        admin=True,
-        user=session["user"]
-    )
-
 
 @app.route("/delete_session/<name>")
 def delete_session(name):
