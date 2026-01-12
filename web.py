@@ -282,47 +282,49 @@ def user_history():
     stats = None
     grand_total = 0
 
-    if uid:
-        data = load_sessions()
+    sessions = load_sessions()
+    access = load_access()
 
-        for sname, s in data["sessions"].items():
-            for o in s["orders"]:
+    if uid:
+        # 🔁 Saml alle ordrer for brugeren
+        for sname, s in sessions["sessions"].items():
+            for o in s.get("orders", []):
                 if o.get("user_id") == uid:
                     orders.append({
                         "session": sname,
-                        "items": o["items"],
-                        "total": o["total"],
-                        "time": o["time"]
+                        "items": o.get("items", {}),
+                        "total": o.get("total", 0),
+                        "time": o.get("time")
                     })
 
         stats = get_user_statistics(uid)
-        if stats:
-            grand_total = stats["total_spent"]
+        grand_total = stats["total_spent"]
 
-    # Fetch user info from access data (including avatar)
-    access = load_access()
-    role = access.get("users", {}).get(uid, {}).get("role", "user")
-
+    # ✅ HENT BRUGER KORREKT
+    raw_user = access.get("users", {}).get(uid)
 
     user_info = None
     if raw_user:
         user_info = {
-            "name": raw_user.get("name"),
-            "role": raw_user.get("role"),
+            "name": raw_user.get("name", "Ukendt"),
+            "role": raw_user.get("role", "user"),
             "avatar": raw_user.get("avatar")
         }
 
-    # Fall back if no stats are found
+    # fallback stats
     if not stats:
         stats = {
             "total_spent": 0,
-            "total_items": 0
+            "total_items": 0,
+            "most_bought": None,
+            "locked": False,
+            "role": "user"
         }
 
     locked_users = []
-    current = load_sessions().get("current")
+    current = sessions.get("current")
     if current:
-        locked_users = load_sessions()["sessions"][current].get("locked_users", [])
+        locked_users = sessions["sessions"].get(current, {}).get("locked_users", [])
 
     return render_template(
         "user_history.html",
@@ -335,6 +337,7 @@ def user_history():
         admin=True,
         user=session["user"]
     )
+
 
 @app.route("/")
 def index():
