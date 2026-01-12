@@ -4,13 +4,32 @@
 {% if stats %}
 <!-- ================= USER HEADER ================= -->
 <div class="card user-header">
-    <div class="user-header-left">
-        {% set avatar_url = "https://cdn.discordapp.com/avatars/" ~ uid ~ "/" ~ user.avatar ~ ".png"
-            if user and user.avatar
-            else "https://cdn.discordapp.com/embed/avatars/0.png" %}
+    <div class="avatar-wrapper" style="position:relative; width:120px; margin:auto;">
+    <img
+        src="https://cdn.discordapp.com/avatars/{{ uid }}/{{ user_info.avatar }}.png"
+        onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"
+        style="width:120px; height:120px; border-radius:50%; border:3px solid #444;"
+    >
 
-        <img class="avatar-lg" src="{{ avatar_url }}">
+    {% if stats.locked %}
+    <div style="
+        position:absolute;
+        inset:0;
+        background:rgba(0,0,0,0.65);
+        border-radius:50%;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-weight:bold;
+        color:#ff4d4d;
+        font-size:1.1em;
+        letter-spacing:1px;
+    ">
+        🔒 LÅST
     </div>
+    {% endif %}
+</div>
+
 
     <div class="user-header-right">
         <h2>{{ user_info.name }}</h2>

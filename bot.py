@@ -15,6 +15,7 @@ DATA_DIR = os.getenv("DATA_DIR", "/data")
 SESSIONS_FILE = f"{DATA_DIR}/sessions.json"
 LAGER_FILE    = f"{DATA_DIR}/lager.json"
 PRICES_FILE   = f"{DATA_DIR}/prices.json"
+USER_STATS_FILE = f"{DATA_DIR}/user_stats.json"
 
 os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -42,6 +43,12 @@ def load_lager():
 
 def load_prices():
     return load_json(PRICES_FILE, {})
+
+def load_user_stats():
+    return load_json(USER_STATS_FILE, {})
+
+def save_user_stats(data):
+    save_json(USER_STATS_FILE, data)
 
 def is_user_locked(session_data, user_id):
     return user_id in session_data.get("locked_users", [])
@@ -88,14 +95,15 @@ async def on_message(message):
 
     data = load_sessions()
     prices = load_prices()
-# ===== ADMIN: LÅS / LÅS OP =====
-    # ===== ADMIN: LÅS / LÅS OP =====
+
+    # =====================
+    # ADMIN: LÅS / LÅS OP
+    # =====================
     if (content.startswith("lås ") or content.startswith("låsop ")) and message.mentions:
         if not message.author.guild_permissions.administrator:
             await message.channel.send("⛔ Kun admins kan låse brugere", delete_after=5)
             return
 
-        data = load_sessions()
         current = data.get("current")
         if not current:
             await message.channel.send("❌ Ingen aktiv bestilling", delete_after=5)
@@ -107,40 +115,29 @@ async def on_message(message):
         target = message.mentions[0]
         uid = str(target.id)
 
-    # 🔒 LÅS
+        # 🔒 LÅS
         if content.startswith("lås "):
             if uid not in session_data["locked_users"]:
                 session_data["locked_users"].append(uid)
                 save_sessions(data)
-                await message.channel.send(
-                    f"🔒 **{target} er nu låst**",
-                    delete_after=5
-                )
+                await message.channel.send(f"🔒 **{target} er nu låst**", delete_after=5)
             else:
-                await message.channel.send(
-                    "ℹ️ Brugeren er allerede låst",
-                    delete_after=5
-                )
+                await message.channel.send("ℹ️ Brugeren er allerede låst", delete_after=5)
             return
 
-    # 🔓 LÅS OP
+        # 🔓 LÅS OP
         if content.startswith("låsop "):
             if uid in session_data["locked_users"]:
                 session_data["locked_users"].remove(uid)
                 save_sessions(data)
-                await message.channel.send(
-                    f"🔓 **{target} er nu låst op**",
-                    delete_after=5
-                )
+                await message.channel.send(f"🔓 **{target} er nu låst op**", delete_after=5)
             else:
-                await message.channel.send(
-                    "ℹ️ Brugeren er ikke låst",
-                    delete_after=5
-                )
+                await message.channel.send("ℹ️ Brugeren er ikke låst", delete_after=5)
             return
 
-
-    # ===== LAGER KOMMANDO =====
+    # =====================
+    # LAGER KOMMANDO
+    # =====================
     if content == "lager":
         remaining = remaining_lager()
         if not remaining:
@@ -153,7 +150,9 @@ async def on_message(message):
         await message.channel.send("\n".join(lines), delete_after=5)
         return
 
-    # ===== AKTIV SESSION =====
+    # =====================
+    # AKTIV SESSION
+    # =====================
     current = data.get("current")
     if not current:
         await message.channel.send("🔴 Ingen aktiv bestilling", delete_after=5)
@@ -161,8 +160,13 @@ async def on_message(message):
 
     session_data = data["sessions"][current]
     session_data.setdefault("locked_users", [])
+
     if not session_data.get("open"):
         await message.channel.send("🔒 Bestillingen er lukket", delete_after=5)
+        return
+
+    if is_user_locked(session_data, str(message.author.id)):
+        await message.channel.send("🔒 Din bestilling er låst af en admin", delete_after=5)
         return
 
     orders = session_data["orders"]
@@ -180,14 +184,9 @@ async def on_message(message):
         }
         orders.append(order)
 
-    # ===== PARSE INPUT =====
-    if is_user_locked(session_data, str(message.author.id)):
-        await message.channel.send(
-            "🔒 Din bestilling er låst af en admin",
-            delete_after=5
-        )
-        return
-
+    # =====================
+    # PARSE INPUT
+    # =====================
     parts = content.split()
 
     if len(parts) == 1:
@@ -213,15 +212,47 @@ async def on_message(message):
         )
         return
 
-    # 🔁 SÆT mængde (IKKE læg til)
+    # =====================
+    # OPDATER ORDRE
+    # =====================
     order["items"][item] = amount
-
-    # genberegn total
-    order["total"] = sum(
-        order["items"][i] * prices[i] for i in order["items"]
-    )
-
+    order["total"] = sum(order["items"][i] * prices[i] for i in order["items"])
     save_sessions(data)
+
+    # =====================
+    # PERSISTENT STATS (DELTA SAFE)
+    # =====================
+    stats = load_user_stats()
+    uid = order["user_id"]
+    order_id = order["id"]
+
+    stats.setdefault(uid, {
+        "total_spent": 0,
+        "total_items": 0,
+        "items": {},
+        "orders": {}
+    })
+
+    previous = stats[uid]["orders"].get(order_id, {
+        "total": 0,
+        "items": {}
+    })
+
+    delta_total = order["total"] - previous.get("total", 0)
+    stats[uid]["total_spent"] += delta_total
+
+    for i, amount in order["items"].items():
+        prev = previous["items"].get(i, 0)
+        delta = amount - prev
+        stats[uid]["total_items"] += delta
+        stats[uid]["items"][i] = stats[uid]["items"].get(i, 0) + delta
+
+    stats[uid]["orders"][order_id] = {
+        "total": order["total"],
+        "items": order["items"].copy()
+    }
+
+    save_user_stats(stats)
 
     await message.channel.send(
         f"✅ **{item} sat til {amount} stk** (Total {order['total']:,} kr)",
