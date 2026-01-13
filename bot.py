@@ -4,6 +4,7 @@ import json
 import discord
 from discord.ext import commands
 from datetime import datetime
+from db import init_db, get_conn
 from db import (
     init_db,
     load_sessions,

@@ -337,6 +337,71 @@ def admin_users():
         user=session["user"]
     )
 
+@app.route("/admin/user_history")
+def user_history():
+    if not is_admin():
+        return "Forbidden", 403
+
+    uid = request.args.get("uid")
+    orders = []
+    grand_total = 0
+
+    sessions = load_sessions()
+    access = load_access()
+    stats = None
+
+    if uid:
+        # 🔁 Saml alle ordrer for brugeren (alle sessions)
+        for sname, s in sessions["sessions"].items():
+            for o in s.get("orders", []):
+                if o.get("user_id") == uid:
+                    orders.append({
+                        "session": sname,
+                        "items": o.get("items", {}),
+                        "total": o.get("total", 0),
+                        "time": o.get("time")
+                    })
+
+        stats = get_user_statistics(uid)
+        grand_total = stats["total_spent"]
+
+    # 👤 Brugerinfo
+    raw_user = access.get("users", {}).get(uid)
+    user_info = None
+    if raw_user:
+        user_info = {
+            "name": raw_user.get("name", "Ukendt"),
+            "role": raw_user.get("role", "user"),
+            "avatar": raw_user.get("avatar")
+        }
+
+    # fallback stats (hvis ingen uid)
+    if not stats:
+        stats = {
+            "total_spent": 0,
+            "total_items": 0,
+            "most_bought": None,
+            "locked": False,
+            "role": "user"
+        }
+
+    # 🔒 låste brugere i aktiv session
+    locked_users = []
+    current = sessions.get("current")
+    if current:
+        locked_users = sessions["sessions"].get(current, {}).get("locked_users", [])
+
+    return render_template(
+        "user_history.html",
+        uid=uid,
+        orders=orders,
+        stats=stats,
+        grand_total=grand_total,
+        user_info=user_info,
+        locked_users=locked_users,
+        admin=True,
+        user=session["user"]
+    )
 
 @app.route("/admin/audit")
 def audit():
