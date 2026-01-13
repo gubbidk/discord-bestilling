@@ -6,12 +6,16 @@ from datetime import datetime
 from urllib.parse import urlencode
 from flask import Flask, render_template, request, redirect, session, jsonify
 from flask_socketio import SocketIO
+from db import init_db
+init_db()
+
 
 # =====================
 # KONFIGURATION
 # =====================
 DATA_DIR = os.getenv("DATA_DIR", "/data")
 os.makedirs(DATA_DIR, exist_ok=True)
+DB_PATH = Path("/data/data.db")
 
 SESSIONS_FILE = f"{DATA_DIR}/sessions.json"
 ACCESS_FILE   = f"{DATA_DIR}/access.json"

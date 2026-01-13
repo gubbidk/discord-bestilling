@@ -4,6 +4,8 @@ import time
 import discord
 from discord.ext import commands
 from datetime import datetime
+from db import init_db
+init_db()
 
 # =====================
 # KONFIG
@@ -16,6 +18,7 @@ SESSIONS_FILE = f"{DATA_DIR}/sessions.json"
 LAGER_FILE    = f"{DATA_DIR}/lager.json"
 PRICES_FILE   = f"{DATA_DIR}/prices.json"
 USER_STATS_FILE = f"{DATA_DIR}/user_stats.json"
+DB_PATH = Path("/data/data.db")
 
 os.makedirs(DATA_DIR, exist_ok=True)
 
