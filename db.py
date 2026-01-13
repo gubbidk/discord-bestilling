@@ -1,7 +1,11 @@
 import sqlite3
 from pathlib import Path
-from db import get_conn
-DB_PATH = Path("data.db")
+import os
+import json
+
+DATA_DIR = os.getenv("DATA_DIR", "/data")
+DB_PATH = Path(DATA_DIR) / "data.db"
+os.makedirs(DATA_DIR, exist_ok=True)
 
 def get_conn():
     return sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -10,65 +14,70 @@ def init_db():
     with get_conn() as conn:
         c = conn.cursor()
 
-        # Lager
+        # sessions.json
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            name TEXT PRIMARY KEY,
+            open INTEGER,
+            data TEXT
+        )
+        """)
+
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS meta (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+        """)
+
+        # lager.json
         c.execute("""
         CREATE TABLE IF NOT EXISTS lager (
             item TEXT PRIMARY KEY,
-            amount INTEGER NOT NULL
+            amount INTEGER
         )
         """)
 
-        # Priser
+        # prices.json
         c.execute("""
         CREATE TABLE IF NOT EXISTS prices (
             item TEXT PRIMARY KEY,
-            price INTEGER NOT NULL
+            price INTEGER
         )
         """)
 
-        # Bruger-statistik
+        # user_stats.json
         c.execute("""
         CREATE TABLE IF NOT EXISTS user_stats (
             user_id TEXT PRIMARY KEY,
-            orders INTEGER DEFAULT 0
+            data TEXT
+        )
+        """)
+
+        # access.json
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS access (
+            user_id TEXT PRIMARY KEY,
+            data TEXT
+        )
+        """)
+
+        # blocked users
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS blocked (
+            user_id TEXT PRIMARY KEY
+        )
+        """)
+
+        # audit.json
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS audit (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            time TEXT,
+            action TEXT,
+            admin TEXT,
+            target TEXT
         )
         """)
 
         conn.commit()
-
-def get_lager(item):
-    with get_conn() as conn:
-        c = conn.cursor()
-        c.execute("SELECT amount FROM lager WHERE item=?", (item,))
-        row = c.fetchone()
-        return row[0] if row else 0
-
-def update_lager(item, delta):
-    with get_conn() as conn:
-        c = conn.cursor()
-        c.execute("""
-        INSERT INTO lager (item, amount)
-        VALUES (?, ?)
-        ON CONFLICT(item)
-        DO UPDATE SET amount = amount + ?
-        """, (item, delta, delta))
-        conn.commit()
-
-def get_price(item):
-    with get_conn() as conn:
-        c = conn.cursor()
-        c.execute("SELECT price FROM prices WHERE item=?", (item,))
-        row = c.fetchone()
-        return row[0] if row else None
-
-def increment_orders(user_id):
-    with get_conn() as conn:
-        c = conn.cursor()
-        c.execute("""
-        INSERT INTO user_stats (user_id, orders)
-        VALUES (?, 1)
-        ON CONFLICT(user_id)
-        DO UPDATE SET orders = orders + 1
-        """, (user_id,))
-        conn.commit()
-

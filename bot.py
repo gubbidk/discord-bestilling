@@ -1,80 +1,89 @@
 import os
-import json
 import time
 import discord
 from discord.ext import commands
 from datetime import datetime
-from db import init_db
+from db import init_db, get_conn
+
 init_db()
 
-# =====================
-# KONFIG
-# =====================
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 BESTIL_CHANNEL_ID = int(os.getenv("BESTIL_CHANNEL_ID", "0"))
-DATA_DIR = os.getenv("DATA_DIR", "/data")
-
-SESSIONS_FILE = f"{DATA_DIR}/sessions.json"
-LAGER_FILE    = f"{DATA_DIR}/lager.json"
-PRICES_FILE   = f"{DATA_DIR}/prices.json"
-USER_STATS_FILE = f"{DATA_DIR}/user_stats.json"
-DB_PATH = Path("/data/data.db")
-
-os.makedirs(DATA_DIR, exist_ok=True)
 
 # =====================
-# JSON HELPERS
+# DB HELPERS
 # =====================
-def load_json(path, default):
-    if not os.path.exists(path):
-        return default
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def save_json(path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
 def load_sessions():
-    return load_json(SESSIONS_FILE, {"current": None, "sessions": {}})
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("SELECT value FROM meta WHERE key='current'")
+        row = c.fetchone()
+        current = None if not row else eval(row[0])
+
+        sessions = {}
+        for name, open_, data in c.execute("SELECT name, open, data FROM sessions"):
+            s = eval(data)
+            s["open"] = bool(open_)
+            s.setdefault("orders", [])
+            s.setdefault("locked_users", [])
+            sessions[name] = s
+
+        return {"current": current, "sessions": sessions}
 
 def save_sessions(data):
-    save_json(SESSIONS_FILE, data)
-
-def load_lager():
-    return load_json(LAGER_FILE, {})
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM sessions")
+        for name, s in data["sessions"].items():
+            c.execute(
+                "INSERT INTO sessions VALUES (?, ?, ?)",
+                (name, int(s.get("open", False)), repr(s))
+            )
+        c.execute(
+            "INSERT OR REPLACE INTO meta VALUES ('current', ?)",
+            (repr(data.get("current")),)
+        )
+        conn.commit()
 
 def load_prices():
-    return load_json(PRICES_FILE, {})
+    with get_conn() as conn:
+        return dict(conn.execute("SELECT item, price FROM prices"))
+
+def load_lager():
+    with get_conn() as conn:
+        return dict(conn.execute("SELECT item, amount FROM lager"))
 
 def load_user_stats():
-    return load_json(USER_STATS_FILE, {})
+    with get_conn() as conn:
+        return {uid: eval(data) for uid, data in conn.execute("SELECT user_id, data FROM user_stats")}
 
-def save_user_stats(data):
-    save_json(USER_STATS_FILE, data)
-
-def is_user_locked(session_data, user_id):
-    return user_id in session_data.get("locked_users", [])
+def save_user_stats(stats):
+    with get_conn() as conn:
+        c = conn.cursor()
+        for uid, data in stats.items():
+            c.execute(
+                "INSERT OR REPLACE INTO user_stats VALUES (?, ?)",
+                (uid, repr(data))
+            )
+        conn.commit()
 
 # =====================
-# LAGER (KUN AKTIV SESSION)
+# LAGER (AKTIV SESSION)
 # =====================
 def remaining_lager():
     data = load_sessions()
-    current = data.get("current")
+    current = data["current"]
     if not current:
         return {}
 
-    orders = data["sessions"][current]["orders"]
     lager = load_lager()
+    used = {k: 0 for k in lager}
 
-    used = {i: 0 for i in lager}
-    for o in orders:
-        for item, amount in o.get("items", {}).items():
-            if item in used:
-                used[item] += amount
+    for o in data["sessions"][current]["orders"]:
+        for item, amount in o["items"].items():
+            used[item] += amount
 
-    return {i: max(0, lager[i] - used[i]) for i in lager}
+    return {k: max(0, lager[k] - used[k]) for k in lager}
 
 # =====================
 # DISCORD BOT
@@ -100,76 +109,16 @@ async def on_message(message):
     prices = load_prices()
 
     # =====================
-    # ADMIN: LÅS / LÅS OP
-    # =====================
-    if (content.startswith("lås ") or content.startswith("låsop ")) and message.mentions:
-        if not message.author.guild_permissions.administrator:
-            await message.channel.send("⛔ Kun admins kan låse brugere", delete_after=5)
-            return
-
-        current = data.get("current")
-        if not current:
-            await message.channel.send("❌ Ingen aktiv bestilling", delete_after=5)
-            return
-
-        session_data = data["sessions"][current]
-        session_data.setdefault("locked_users", [])
-
-        target = message.mentions[0]
-        uid = str(target.id)
-
-        # 🔒 LÅS
-        if content.startswith("lås "):
-            if uid not in session_data["locked_users"]:
-                session_data["locked_users"].append(uid)
-                save_sessions(data)
-                await message.channel.send(f"🔒 **{target} er nu låst**", delete_after=5)
-            else:
-                await message.channel.send("ℹ️ Brugeren er allerede låst", delete_after=5)
-            return
-
-        # 🔓 LÅS OP
-        if content.startswith("låsop "):
-            if uid in session_data["locked_users"]:
-                session_data["locked_users"].remove(uid)
-                save_sessions(data)
-                await message.channel.send(f"🔓 **{target} er nu låst op**", delete_after=5)
-            else:
-                await message.channel.send("ℹ️ Brugeren er ikke låst", delete_after=5)
-            return
-
-    # =====================
-    # LAGER KOMMANDO
-    # =====================
-    if content == "lager":
-        remaining = remaining_lager()
-        if not remaining:
-            await message.channel.send("📦 Ingen aktiv bestilling", delete_after=5)
-            return
-
-        lines = ["📦 **Lagerstatus**"]
-        for item, amount in remaining.items():
-            lines.append(f"• **{item}**: {amount}")
-        await message.channel.send("\n".join(lines), delete_after=5)
-        return
-
-    # =====================
     # AKTIV SESSION
     # =====================
-    current = data.get("current")
+    current = data["current"]
     if not current:
         await message.channel.send("🔴 Ingen aktiv bestilling", delete_after=5)
         return
 
     session_data = data["sessions"][current]
-    session_data.setdefault("locked_users", [])
-
-    if not session_data.get("open"):
+    if not session_data["open"]:
         await message.channel.send("🔒 Bestillingen er lukket", delete_after=5)
-        return
-
-    if is_user_locked(session_data, str(message.author.id)):
-        await message.channel.send("🔒 Din bestilling er låst af en admin", delete_after=5)
         return
 
     orders = session_data["orders"]
@@ -187,47 +136,28 @@ async def on_message(message):
         }
         orders.append(order)
 
-    # =====================
-    # PARSE INPUT
-    # =====================
     parts = content.split()
-
-    if len(parts) == 1:
-        amount = 1
-        item = parts[0]
-    elif len(parts) >= 2 and parts[0].isdigit():
-        amount = int(parts[0])
-        item = parts[1]
-    else:
-        await message.channel.send("❌ Ugyldigt format", delete_after=5)
-        return
+    amount = int(parts[0]) if len(parts) > 1 and parts[0].isdigit() else 1
+    item = parts[-1]
 
     remaining = remaining_lager()
-
     if item not in prices:
-        await message.channel.send(f"❌ Ukendt vare: {item}", delete_after=5)
+        await message.channel.send("❌ Ukendt vare", delete_after=5)
         return
 
     if amount > remaining.get(item, 0):
-        await message.channel.send(
-            f"⚠️ Kun {remaining.get(item, 0)} {item} tilbage på lager",
-            delete_after=5
-        )
+        await message.channel.send("⚠️ Ikke nok på lager", delete_after=5)
         return
 
-    # =====================
-    # OPDATER ORDRE
-    # =====================
     order["items"][item] = amount
     order["total"] = sum(order["items"][i] * prices[i] for i in order["items"])
     save_sessions(data)
 
     # =====================
-    # PERSISTENT STATS (DELTA SAFE)
+    # USER STATS
     # =====================
     stats = load_user_stats()
     uid = order["user_id"]
-    order_id = order["id"]
 
     stats.setdefault(uid, {
         "total_spent": 0,
@@ -236,33 +166,16 @@ async def on_message(message):
         "orders": {}
     })
 
-    previous = stats[uid]["orders"].get(order_id, {
-        "total": 0,
-        "items": {}
-    })
-
-    delta_total = order["total"] - previous.get("total", 0)
-    stats[uid]["total_spent"] += delta_total
-
-    for i, amount in order["items"].items():
-        prev = previous["items"].get(i, 0)
-        delta = amount - prev
-        stats[uid]["total_items"] += delta
-        stats[uid]["items"][i] = stats[uid]["items"].get(i, 0) + delta
-
-    stats[uid]["orders"][order_id] = {
-        "total": order["total"],
-        "items": order["items"].copy()
-    }
+    stats[uid]["total_spent"] += order["total"]
+    stats[uid]["total_items"] += amount
+    stats[uid]["items"][item] = stats[uid]["items"].get(item, 0) + amount
+    stats[uid]["orders"][order["id"]] = order
 
     save_user_stats(stats)
 
     await message.channel.send(
-        f"✅ **{item} sat til {amount} stk** (Total {order['total']:,} kr)",
+        f"✅ **{item} sat til {amount} stk** ({order['total']} kr)",
         delete_after=3
     )
 
-# =====================
-# START
-# =====================
 bot.run(DISCORD_TOKEN)
