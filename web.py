@@ -312,6 +312,32 @@ def unblock_user(uid):
         audit_log("unblock", session["user"]["name"], uid)
     return redirect("/admin/users")
 
+@app.route("/admin/users")
+def admin_users():
+    if not is_admin():
+        return "Forbidden", 403
+
+    access = load_access()
+
+    users = dict(
+        sorted(
+            access["users"].items(),
+            key=lambda x: (
+                0 if x[1].get("role") == "admin" else 1,
+                x[1].get("name", "").lower()
+            )
+        )
+    )
+
+    return render_template(
+        "admin_users.html",
+        users=users,
+        blocked=access["blocked"],
+        admin=True,
+        user=session["user"]
+    )
+
+
 @app.route("/admin/audit")
 def audit():
     if not is_admin():
