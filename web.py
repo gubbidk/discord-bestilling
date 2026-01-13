@@ -414,6 +414,33 @@ def audit():
     events = load_access()  # dummy read to ensure DB ready
     return render_template("audit.html", events=[])
 
+@app.route("/session/<name>")
+def view_session(name):
+    if "user" not in session:
+        return redirect("/login")
+
+    data = load_sessions()
+
+    session_data = data["sessions"].get(name)
+    if not session_data:
+        return "Findes ikke", 404
+
+    orders = session_data.get("orders", [])
+    total = sum(o.get("total", 0) for o in orders)
+
+    lager_status = get_lager_status_for_session(name)
+
+    return render_template(
+        "session.html",
+        name=name,
+        orders=orders,
+        total=total,
+        lager_status=lager_status,
+        admin=is_admin(),
+        user=session["user"]
+    )
+
+
 @app.route("/session_data/<name>")
 def session_data(name):
     data = load_sessions()
