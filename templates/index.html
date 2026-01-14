@@ -5,26 +5,32 @@
 <section class="card stats-dashboard">
 
     <div class="stats-header">
-        <div class="avatar-circle">
-            <img src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png"
-                 onerror="this.src='/static/default_avatar.png'">
+        <div class="avatar-circle" style="position: relative;">
+            <img
+                src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png"
+                onerror="this.src='/static/default_avatar.png'"
+                style="border-radius:50%;"
+            >
+
             {% if stats.locked %}
             <div style="
-            position:absolute;
-            inset:0;
-            background:rgba(0,0,0,0.65);
-            border-radius:50%;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            font-weight:bold;
-            color:#ff4d4d;
-            font-size:1.1em;
-            letter-spacing:1px;
-        ">
-            🔒 LÅST
+                position: absolute;
+                inset: 0;
+                background: rgba(0,0,0,0.65);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                color: #ff4d4d;
+                font-size: 1.1em;
+                letter-spacing: 1px;
+                text-transform: uppercase;
+            ">
+                🔒 LÅST
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
 
         <div>
