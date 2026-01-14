@@ -229,6 +229,27 @@ def audit_log(action, admin, target):
     return True
 
 
+def load_audit():
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute(
+                """
+                SELECT time, action, admin, target
+                FROM audit
+                ORDER BY id DESC
+                """
+            )
+            rows = c.fetchall()
+
+    return [
+        {
+            "time": time,
+            "action": action,
+            "admin": admin,
+            "target": target
+        }
+        for time, action, admin, target in rows
+    ]
 
 
 # =====================

@@ -17,7 +17,8 @@ from db import (
     load_prices,
     load_user_stats,
     save_user_stats,
-    audit_log
+    audit_log,
+    load_audit
 )
 
 init_db()
@@ -408,11 +409,19 @@ def audit():
     if not is_admin():
         return "Forbidden", 403
 
-    with open("/dev/null"):
-        pass  # placeholder to keep structure clean
+    events = load_audit()
 
-    events = load_access()  # dummy read to ensure DB ready
-    return render_template("audit.html", events=[])
+    action = request.args.get("action")
+    if action:
+        events = [e for e in events if e["action"] == action]
+
+    return render_template(
+        "audit.html",
+        events=events,
+        admin=True,
+        user=session["user"]
+    )
+
 
 @app.route("/session/<name>")
 def view_session(name):

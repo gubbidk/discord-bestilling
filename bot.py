@@ -124,6 +124,15 @@ async def on_message(message):
     if not session_data["open"]:
         await message.channel.send("🔒 Bestillingen er lukket", delete_after=5)
         return
+    session_data = data["sessions"][current]
+
+# 🔒 LOCK CHECK
+    if str(message.author.id) in session_data.get("locked_users", []):
+        await message.channel.send(
+            "🔒 Du er **låst** og kan ikke bestille i denne session.",
+            delete_after=5
+        )
+        return
 
     orders = session_data["orders"]
     user = str(message.author)
