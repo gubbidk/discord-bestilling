@@ -457,6 +457,173 @@ def session_data(name):
     payload = json.dumps(orders, sort_keys=True)
     return jsonify({"hash": hashlib.md5(payload.encode()).hexdigest()})
 
+@app.route("/create_order/<session_name>")
+def create_order(session_name):
+    if "user" not in session:
+        return redirect("/login")
+
+    data = load_sessions()
+    s = data["sessions"].get(session_name)
+    if not s or not s.get("open"):
+        return "Bestilling lukket", 403
+
+    uid = session["user"]["id"]
+
+    # findes der allerede?
+    for o in s["orders"]:
+        if o["user_id"] == uid:
+            return redirect(f"/session/{session_name}")
+
+    prices = load_prices()
+
+    order = {
+        "id": str(datetime.now().timestamp()),
+        "user": session["user"]["name"],
+        "user_id": uid,
+        "items": {k: 0 for k in prices},
+        "total": 0,
+        "time": datetime.now().strftime("%d-%m-%Y %H:%M"),
+        "paid": False,
+        "delivered": False
+    }
+
+    s["orders"].append(order)
+    save_sessions(data)
+
+    audit_log("create_order", session["user"]["name"], session_name)
+
+    return redirect(f"/edit_own_order/{session_name}")
+
+@app.route("/edit_own_order/<session_name>/<order_id>", methods=["GET", "POST"])
+def edit_own_order(session_name, order_id):
+    if "user" not in session:
+        return redirect("/login")
+
+    data = load_sessions()
+    session_data = data["sessions"].get(session_name)
+    if not session_data:
+        return "Session not found", 404
+
+    orders = session_data["orders"]
+    order = next((o for o in orders if o["id"] == order_id), None)
+    if not order:
+        return "Order not found", 404
+
+    # 🔐 EJERSKAB – KUN ORDRENS EGEN BRUGER
+    if order.get("user_id") != session["user"]["id"]:
+        return "Du må kun redigere din egen ordre", 403
+
+    # 🔒 LÅS HVIS BETALT ELLER LEVERET
+    if order.get("paid") or order.get("delivered"):
+        return "Ordren er låst og kan ikke redigeres", 403
+    if order.get("user_id") != session["user"]["id"]:
+        audit_log(
+            "edit_own_order_denied",
+            session["user"]["name"],
+            order_id
+        )
+        return "Forbidden", 403
+
+    prices = load_prices()
+    lager = load_lager()
+
+    if request.method == "POST":
+        before_items = order["items"].copy()
+        before_total = order["total"]
+
+        # 🔁 beregn brugt lager
+        used = {}
+        for o in orders:
+            for item, amount in o["items"].items():
+                used[item] = used.get(item, 0) + amount
+
+        total = 0
+        for item in order["items"]:
+            requested = int(request.form.get(item, 0))
+            used_by_others = used.get(item, 0) - before_items.get(item, 0)
+            max_allowed = max(0, lager.get(item, 0) - used_by_others)
+            final_amount = min(requested, max_allowed)
+
+            order["items"][item] = final_amount
+            total += final_amount * prices.get(item, 0)
+
+        order["total"] = total
+        save_sessions(data)
+
+        audit_log(
+            "edit_own_order",
+            session["user"]["name"],
+            f"{session_name}:{order_id}"
+        )
+
+        return redirect(f"/session/{session_name}")
+
+    return render_template(
+        "edit_order.html",
+        order=order,
+        prices=prices,
+        lager=lager,
+        session_name=session_name,
+        admin=False,
+        user=session["user"]
+    )
+
+
+@app.route("/admin/order_paid/<session_name>/<order_id>")
+def mark_paid(session_name, order_id):
+    if not is_admin():
+        return "Forbidden", 403
+
+    data = load_sessions()
+    order = next(
+        o for o in data["sessions"][session_name]["orders"]
+        if o["id"] == order_id
+    )
+
+    order["paid"] = True
+    save_sessions(data)
+
+    audit_log("order_paid", session["user"]["name"], order_id)
+    return redirect(f"/session/{session_name}")
+
+
+@app.route("/admin/order_delivered/<session_name>/<order_id>")
+def mark_delivered(session_name, order_id):
+    if not is_admin():
+        return "Forbidden", 403
+
+    data = load_sessions()
+    order = next(
+        o for o in data["sessions"][session_name]["orders"]
+        if o["id"] == order_id
+    )
+
+    order["delivered"] = True
+    save_sessions(data)
+
+    audit_log("order_delivered", session["user"]["name"], order_id)
+    return redirect(f"/session/{session_name}")
+
+@app.route("/admin/order_unpaid/<session_name>/<order_id>")
+def order_unpaid(session_name, order_id):
+    if not is_admin():
+        return "Forbidden", 403
+
+    data = load_sessions()
+    order = next(
+        o for o in data["sessions"][session_name]["orders"]
+        if o["id"] == order_id
+    )
+
+    order["paid"] = False
+    order["delivered"] = False  # sikkerhed
+
+    save_sessions(data)
+    audit_log("order_unpaid", session["user"]["name"], order_id)
+
+    return redirect(f"/session/{session_name}")
+
+
 # =========================================================
 # ❌ DELETE ORDER
 # =========================================================

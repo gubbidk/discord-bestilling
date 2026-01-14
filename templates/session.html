@@ -7,97 +7,125 @@
 </head>
 <body>
 
-<!-- HEADER -->
 <header class="top">
-    <div class="header-left">
-        {% if user.avatar %}
-        <img
-            src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png"
-            class="avatar"
-        >
-        {% endif %}
-
-        <div>
-            <h1>📦 {{ name }}</h1>
-            <div class="muted">
-                Logget ind som <strong>{{ user.name }}</strong>
-                {% if admin %}<span class="badge admin">ADMIN</span>{% endif %}
-            </div>
-
-            <div class="actions">
-                <a href="/" class="btn blue">← Oversigt</a>
-            </div>
+    <div>
+        <h1>📦 {{ name }}</h1>
+        <div class="muted">
+            Logget ind som <strong>{{ user.name }}</strong>
+            {% if admin %}<span class="badge admin">ADMIN</span>{% endif %}
         </div>
+        <a href="/" class="btn blue">← Oversigt</a>
     </div>
 </header>
 
 <main class="container">
 
+<!-- ===================== -->
 <!-- 🧾 ORDRER -->
+<!-- ===================== -->
 <section class="card">
     <h2>🧾 Ordrer</h2>
 
     {% if orders %}
+
+    <!-- 🔍 FILTER -->
+    <div style="margin-bottom:10px;">
+        <label>
+            <input type="checkbox" id="only-unpaid" onchange="toggleUnpaid()">
+            Vis kun ikke-betalte ordrer
+        </label>
+    </div>
+
     <table class="table">
         <thead>
             <tr>
                 <th>Bruger</th>
                 <th>Bestilling</th>
                 <th>Total</th>
-                {% if admin %}
-                <th>Admin</th>
-                {% endif %}
+                <th>Status</th>
+                {% if admin %}<th>Admin</th>{% endif %}
             </tr>
         </thead>
+
         <tbody>
-
         {% for o in orders %}
-            <tr>
-                <td>{{ o.user }}</td>
+        <tr data-paid="{{ 'true' if o.paid else 'false' }}">
+            <td>{{ o.user }}</td>
 
-                <td>
-                    <ul class="item-list">
-                    {% for item, amount in o["items"].items() %}
-                        {% if amount > 0 %}
-                            <li>{{ item }} × {{ amount }}</li>
-                        {% endif %}
-                    {% endfor %}
-                    </ul>
-                </td>
+            <td>
+                <ul>
+                {% for item, amount in o.items.items() %}
+                    {% if amount > 0 %}
+                        <li>{{ item }} × {{ amount }}</li>
+                    {% endif %}
+                {% endfor %}
+                </ul>
+            </td>
 
-                <td>{{ "{:,}".format(o.total or 0) }} kr</td>
+            <td>{{ "{:,}".format(o.total or 0) }} kr</td>
 
-                {% if admin %}
-                <td class="admin-actions">
+            <td>
+                {% if o.paid %}🟢 Betalt{% endif %}
+                {% if o.delivered %} 🔵 Leveret{% endif %}
+            </td>
+
+            {% if admin %}
+            <td class="admin-actions">
+
+                <!-- 🟢 BETALT / 🔴 FORTRYD -->
+                {% if not o.paid %}
+                    <a class="icon-btn green"
+                       href="/admin/order_paid/{{ name }}/{{ o.id }}"
+                       title="Marker som betalt">💰</a>
+                {% else %}
+                    <a class="icon-btn danger"
+                       href="/admin/order_unpaid/{{ name }}/{{ o.id }}"
+                       title="Fortryd betalt">↩️</a>
+                {% endif %}
+
+                <!-- 🔵 LEVERET -->
+                {% if o.paid and not o.delivered %}
+                    <a class="icon-btn blue"
+                       href="/admin/order_delivered/{{ name }}/{{ o.id }}"
+                       title="Marker som leveret">📦</a>
+                {% endif %}
+
+                <!-- ✏️ REDIGER (kun hvis ikke betalt) -->
+                {% if not o.paid %}
                     <a class="icon-btn"
                        href="/edit_order/{{ name }}/{{ o.id }}"
                        title="Rediger ordre">✏️</a>
-
-                    <a class="icon-btn danger"
-                       href="/delete_order/{{ name }}/{{ o.id }}"
-                       onclick="return confirm('Vil du slette denne ordre?')"
-                       title="Slet ordre">❌</a>
-                </td>
+                {% else %}
+                    <span class="icon-btn disabled" title="Ordre er betalt">🔒</span>
                 {% endif %}
-            </tr>
+
+                <!-- ❌ SLET -->
+                <a class="icon-btn danger"
+                   href="/delete_order/{{ name }}/{{ o.id }}"
+                   onclick="return confirm('Vil du slette denne ordre?')"
+                   title="Slet ordre">❌</a>
+            </td>
+            {% endif %}
+        </tr>
         {% endfor %}
         </tbody>
     </table>
 
-    <div class="total-line">
+    <p class="total-line">
         <strong>Samlet total:</strong>
         {{ "{:,}".format(total or 0) }} kr
-    </div>
+    </p>
 
     {% else %}
-        <p class="muted">Ingen ordrer endnu – samlet total 0 kr</p>
+        <p class="muted">Ingen ordrer endnu.</p>
     {% endif %}
 </section>
 
+<!-- ===================== -->
 <!-- 📦 LAGERSTATUS -->
+<!-- ===================== -->
 <section class="card">
     <h2>📦 Lagerstatus</h2>
-
     <div class="lager-grid">
         {% for item, s in lager_status.items() %}
         <div class="lager-item {{ s.level }}">
@@ -108,37 +136,46 @@
     </div>
 </section>
 
+<!-- ===================== -->
 <!-- 🛠 ADMIN -->
+<!-- ===================== -->
 {% if admin %}
 <section class="card">
     <h2>🛠 Admin</h2>
     <div class="admin-bar">
         <a href="/open_session" class="btn green">➕ Åbn ny bestilling</a>
         <a href="/close_session" class="btn orange">🔒 Luk bestilling</a>
-        <a href="/admin/audit" class="btn blue">📜 Audit log</a>
+        <a href="/admin/audit" class="btn blue">📜 Audit</a>
     </div>
 </section>
 {% endif %}
 
 </main>
 
+<!-- ===================== -->
+<!-- 🔍 FILTER SCRIPT -->
+<!-- ===================== -->
+<script>
+function toggleUnpaid() {
+    const onlyUnpaid = document.getElementById("only-unpaid").checked;
+    document.querySelectorAll("tbody tr").forEach(row => {
+        const paid = row.dataset.paid === "true";
+        row.style.display = (onlyUnpaid && paid) ? "none" : "";
+    });
+}
+</script>
+
+<!-- ===================== -->
 <!-- 🔄 REAL-TIME UPDATE -->
+<!-- ===================== -->
 <script>
 let lastHash = null;
 
 async function pollSession() {
-    try {
-        const res = await fetch("/session_data/{{ name }}");
-        const data = await res.json();
-
-        if (lastHash && lastHash !== data.hash) {
-            location.reload();
-        }
-
-        lastHash = data.hash;
-    } catch (e) {
-        console.error("Polling fejl", e);
-    }
+    const res = await fetch("/session_data/{{ name }}");
+    const data = await res.json();
+    if (lastHash && lastHash !== data.hash) location.reload();
+    lastHash = data.hash;
 }
 
 setInterval(pollSession, 2000);

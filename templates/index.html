@@ -5,70 +5,48 @@
 <section class="card stats-dashboard">
 
     <div class="avatar-circle" style="
-    position: relative;
-    width: 96px;
-    height: 96px;
-    border-radius: 50%;
-    overflow: hidden;
-">
-    <img
-        src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png"
-        onerror="this.src='/static/default_avatar.png'"
-        style="
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        "
-    >
-
-    {% if stats.locked %}
-    <div style="
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.7);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        color: #ff4d4d;
-        font-size: 1em;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        pointer-events: none;
+        position: relative;
+        width: 96px;
+        height: 96px;
+        border-radius: 50%;
+        overflow: hidden;
     ">
-        🔒 LÅST
-    </div>
-    {% endif %}
-</div>
-        <div>
-            <h3>{{ user.name }}</h3>
-            <span class="role">
-                {% if stats.role == "admin" %}
-                    🛡️ Admin
-                {% else %}
-                    👤 Bruger
-                {% endif %}
-            </span>
+        <img
+            src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png"
+            onerror="this.src='/static/default_avatar.png'"
+            style="width:100%;height:100%;object-fit:cover;"
+        >
+
+        {% if stats.locked %}
+        <div style="
+            position:absolute;
+            inset:0;
+            background:rgba(0,0,0,0.7);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-weight:bold;
+            color:#ff4d4d;
+            pointer-events:none;
+        ">
+            🔒 LÅST
         </div>
+        {% endif %}
     </div>
+
+    <h3>{{ user.name }}</h3>
 
     <div class="stats-grid">
         <div class="stat-box">
-            <span class="label">💰 Samlet brugt</span>
+            <span>💰 Samlet brugt</span>
             <strong>{{ "{:,}".format(stats.total_spent) }} kr</strong>
         </div>
-
         <div class="stat-box">
-            <span class="label">📦 Varer købt</span>
+            <span>📦 Varer købt</span>
             <strong>{{ stats.total_items }}</strong>
         </div>
-
         <div class="stat-box">
-            <span class="label">⭐ Mest købt</span>
+            <span>⭐ Mest købt</span>
             <strong>{{ stats.most_bought or "—" }}</strong>
         </div>
     </div>
@@ -76,53 +54,51 @@
 </section>
 {% endif %}
 
-
-
 <h2>📋 Bestillinger</h2>
 
-<!-- Display Orders/Sessions -->
-{% if sessions %}
 <div class="grid">
-    {% for name, session in sessions.items() %}
-        <div class="card">
-            <h3>
-                {{ name }}
-                {% if not session.open %}
-                    <span title="Bestilling lukket">🔒</span>
-                {% endif %}
-            </h3>
-            <p>
-                💰 <strong>Total:</strong> {{ totals.get(name, 0) }} kr
-            </p>
-            <div class="actions">
-                <a class="btn" href="/session/{{ name }}">Åbn</a>
-                {% if admin %}
-                    <a class="btn danger" href="/delete_session/{{ name }}" onclick="return confirm('Vil du slette hele bestillingen?')">❌</a>
-                {% endif %}
-            </div>
-        </div>
-    {% endfor %}
-</div>
-{% else %}
-<p>Der er ingen bestillinger endnu.</p>
-{% endif %}
+{% for name, session in sessions.items() %}
+    <div class="card">
+        <h3>
+            {{ name }}
+            {% if not session.open %}🔒{% endif %}
+        </h3>
 
-<hr>
+        <p>💰 {{ totals.get(name, 0) }} kr</p>
+
+        {% set has_order = false %}
+        {% for o in session.orders %}
+            {% if o.user_id == user.id %}
+                {% set has_order = true %}
+            {% endif %}
+        {% endfor %}
+
+        <div class="actions">
+            {% if has_order %}
+                <a class="btn" href="/session/{{ name }}">Åbn</a>
+            {% elif session.open and not stats.locked %}
+                <a class="btn green" href="/create_order/{{ name }}">➕ Opret bestilling</a>
+            {% endif %}
+
+            {% if admin %}
+                <a class="btn danger"
+                   href="/delete_session/{{ name }}"
+                   onclick="return confirm('Slet hele bestillingen?')">❌</a>
+            {% endif %}
+        </div>
+    </div>
+{% endfor %}
+</div>
 
 {% if admin %}
-<section class="card admin-panel">
+<section class="card">
     <h2>🛠 Admin</h2>
-    <div class="admin-grid">
-        <a class="btn blue" href="/admin">🛠 Admin panel</a>
-    </div>
+    <a class="btn blue" href="/admin">Admin panel</a>
 </section>
 {% endif %}
 
 <script>
-/* Simple real-time refresh (keeps current solution) */
-setInterval(() => {
-    location.reload();
-}, 4000);
+setInterval(() => location.reload(), 4000);
 </script>
 
 {% endblock %}
