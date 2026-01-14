@@ -297,12 +297,42 @@ def delete_session(name):
 
 @app.route("/admin/block/<uid>")
 def block_user(uid):
+    if not is_admin():
+        return "Forbidden", 403
+
     access = load_access()
+
+    user = access["users"].get(uid)
+
+    # 🔒 Brugeren findes ikke
+    if not user:
+        return redirect("/admin/users")
+
+    # 🚫 Kan ikke blokere admins
+    if user.get("role") == "admin":
+        audit_log(
+            "block_denied_admin",
+            session["user"]["name"],
+            uid
+        )
+        return redirect("/admin/users")
+
+    # 🚫 Kan ikke blokere sig selv
+    if uid == session["user"]["id"]:
+        audit_log(
+            "block_denied_self",
+            session["user"]["name"],
+            uid
+        )
+        return redirect("/admin/users")
+
     if uid not in access["blocked"]:
         access["blocked"].append(uid)
         save_access(access)
         audit_log("block", session["user"]["name"], uid)
+
     return redirect("/admin/users")
+
 
 @app.route("/admin/unblock/<uid>")
 def unblock_user(uid):
@@ -479,13 +509,14 @@ def create_order(session_name):
     order = {
         "id": str(datetime.now().timestamp()),
         "user": session["user"]["name"],
-        "user_id": uid,
-        "items": {k: 0 for k in prices},
+        "user_id": session["user"]["id"],
+        "items": {k: 0 for k in load_prices()},
         "total": 0,
         "time": datetime.now().strftime("%d-%m-%Y %H:%M"),
         "paid": False,
         "delivered": False
     }
+
 
     s["orders"].append(order)
     save_sessions(data)

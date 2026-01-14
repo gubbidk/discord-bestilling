@@ -98,6 +98,10 @@ def load_sessions():
                 data.setdefault("orders", [])
                 data.setdefault("locked_users", [])
                 sessions[name] = data
+            for s in sessions.values():
+                for o in s.get("orders", []):
+                o.setdefault("paid", False)
+                o.setdefault("delivered", False)
 
             return {
                 "current": current,
