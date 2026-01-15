@@ -86,27 +86,30 @@ def init_db():
 # =====================
 def load_sessions():
     with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("SELECT value FROM meta WHERE key='current'")
-            row = c.fetchone()
-            current = row[0] if row else None
+        c = conn.cursor()
 
-            sessions = {}
-            c.execute("SELECT name, open, data FROM sessions")
-            for name, open_, data in c.fetchall():
-                data["open"] = open_
-                data.setdefault("orders", [])
-                data.setdefault("locked_users", [])
-                sessions[name] = data
-            for s in sessions.values():
-                for o in s.get("orders", []):
+        cur = c.execute("SELECT value FROM meta WHERE key='current'").fetchone()
+        current = None if not cur else cur[0]
+
+        sessions = {}
+        for name, open_, data in c.execute("SELECT name, open, data FROM sessions"):
+            s = data
+            s["open"] = bool(open_)
+            s.setdefault("orders", [])
+            s.setdefault("locked_users", [])
+
+            # 🔧 VIGTIGT: FIX GAMLE ORDRER
+            for o in s["orders"]:
                 o.setdefault("paid", False)
                 o.setdefault("delivered", False)
 
-            return {
-                "current": current,
-                "sessions": sessions
-            }
+            sessions[name] = s
+
+        return {
+            "current": current,
+            "sessions": sessions
+        }
+
 
 
 def save_sessions(data):
