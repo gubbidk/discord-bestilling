@@ -82,8 +82,9 @@ def init_db():
 
 
 # =====================
-# SESSIONS
+# SESSIONS FUCK AEJJEJEADADAERTGGG
 # =====================
+
 def load_sessions():
     with get_conn() as conn:
         c = conn.cursor()
