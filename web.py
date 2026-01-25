@@ -533,7 +533,7 @@ def create_order(session_name):
 
     audit_log("create_order", session["user"]["name"], session_name)
 
-    return redirect(f"/edit_own_order/{session_name}")
+    return redirect(f"/edit_own_order/{session_name}/{order['id']}")
 
 @app.route("/edit_own_order/<session_name>/<order_id>", methods=["GET", "POST"])
 def edit_own_order(session_name, order_id):
