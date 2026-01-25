@@ -32,6 +32,7 @@ DISCORD_ADMIN_ROLE = os.getenv("DISCORD_ADMIN_ROLE")
 DISCORD_USER_ROLE = os.getenv("DISCORD_USER_ROLE")
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_TOKEN")
 
+BASE_URL = "https://discord-bestilling-yfte.onrender.com"
 OAUTH_REDIRECT = "/auth/callback"
 
 # =====================
@@ -113,13 +114,22 @@ def enforce_blocked():
 # =====================
 @app.route("/login")
 def login():
+    redirect_uri = BASE_URL + OAUTH_REDIRECT
+
+    print("DISCORD REDIRECT =", redirect_uri)
+
     params = {
         "client_id": DISCORD_CLIENT_ID,
-        "redirect_uri": request.url_root.strip("/") + OAUTH_REDIRECT,
+        "redirect_uri": redirect_uri,
         "response_type": "code",
         "scope": "identify guilds.members.read"
     }
-    return redirect("https://discord.com/api/oauth2/authorize?" + urlencode(params))
+
+    return redirect(
+        "https://discord.com/api/oauth2/authorize?"
+        + urlencode(params)
+    )
+
 
 @app.route("/auth/callback")
 def auth_callback():
