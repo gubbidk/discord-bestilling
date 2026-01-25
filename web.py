@@ -21,7 +21,6 @@ from db import (
     load_audit
 )
 
-init_db()
 
 # =====================
 # KONFIG
@@ -41,7 +40,8 @@ OAUTH_REDIRECT = "/auth/callback"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "dev-secret")
 socketio = SocketIO(app, cors_allowed_origins="*")
-
+with app.app_context():
+    init_db()
 # =====================
 # HELPERS
 # =====================
@@ -134,7 +134,7 @@ def auth_callback():
             "client_secret": DISCORD_CLIENT_SECRET,
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": request.url_root.strip("/") + OAUTH_REDIRECT
+            "redirect_uri": "https://discord-bestilling-yfte.onrender.com/auth/callback"
         },
         headers={"Content-Type": "application/x-www-form-urlencoded"}
     ).json().get("access_token")
