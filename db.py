@@ -36,92 +36,87 @@ def init_db():
             )
             """)
 
-        # default meta row
+        # 🔥 RYD AL GAMMEL DATA (KUN VED INIT)
+        for table in ["sessions", "access", "lager", "prices", "user_stats", "audit"]:
+            cur.execute(f"DELETE FROM {table}")
+
+        cur.execute("DELETE FROM meta")
+
+        # default meta
         cur.execute("""
         INSERT INTO meta (key, value)
         VALUES ('current', NULL)
-        ON CONFLICT (key) DO NOTHING
         """)
 
         # =====================
-        # SESSIONS (kun hvis tom)
+        # SESSIONS
         # =====================
-        cur.execute("SELECT COUNT(*) FROM sessions")
-        if cur.fetchone()[0] == 0:
-            cur.execute(
-                "INSERT INTO sessions (data) VALUES (%s)",
-                (json.dumps({"current": None, "sessions": {}}),)
-            )
+        cur.execute(
+            "INSERT INTO sessions (data) VALUES (%s)",
+            (json.dumps({"current": None, "sessions": {}}),)
+        )
 
         # =====================
-        # ACCESS (kun hvis tom)
+        # ACCESS
         # =====================
-        cur.execute("SELECT COUNT(*) FROM access")
-        if cur.fetchone()[0] == 0:
-            cur.execute(
-                "INSERT INTO access (data) VALUES (%s)",
-                (json.dumps({"users": {}, "blocked": []}),)
-            )
+        cur.execute(
+            "INSERT INTO access (data) VALUES (%s)",
+            (json.dumps({"users": {}, "blocked": []}),)
+        )
 
         # =====================
-        # 🔫 LAGER (kun hvis tom)
+        # 🔫 LAGER
         # =====================
-        cur.execute("SELECT COUNT(*) FROM lager")
-        if cur.fetchone()[0] == 0:
-            cur.execute(
-                "INSERT INTO lager (data) VALUES (%s)",
-                (json.dumps({
-                    "SNS": 20,
-                    "9mm": 20,
-                    "vintage": 10,
-                    "ceramic": 10,
-                    "xm3": 10,
-                    "deagle": 10,
-                    "Pump": 10,
-                    "veste": 200
-                }),)
-            )
+        cur.execute(
+            "INSERT INTO lager (data) VALUES (%s)",
+            (json.dumps({
+                "SNS": 20,
+                "9mm": 20,
+                "vintage": 10,
+                "ceramic": 10,
+                "xm3": 10,
+                "deagle": 10,
+                "Pump": 10,
+                "veste": 200
+            }),)
+        )
 
         # =====================
-        # 💰 PRISER (kun hvis tom)
+        # 💰 PRISER
         # =====================
-        cur.execute("SELECT COUNT(*) FROM prices")
-        if cur.fetchone()[0] == 0:
-            cur.execute(
-                "INSERT INTO prices (data) VALUES (%s)",
-                (json.dumps({
-                    "SNS": 500000,
-                    "9mm": 800000,
-                    "vintage": 950000,
-                    "ceramic": 950000,
-                    "xm3": 1500000,
-                    "deagle": 1700000,
-                    "Pump": 2550000,
-                    "veste": 350000
-                }),)
-            )
+        cur.execute(
+            "INSERT INTO prices (data) VALUES (%s)",
+            (json.dumps({
+                "SNS": 500000,
+                "9mm": 800000,
+                "vintage": 950000,
+                "ceramic": 950000,
+                "xm3": 1500000,
+                "deagle": 1700000,
+                "Pump": 2550000,
+                "veste": 350000
+            }),)
+        )
 
         # =====================
-        # USER STATS (kun hvis tom)
+        # USER STATS
         # =====================
-        cur.execute("SELECT COUNT(*) FROM user_stats")
-        if cur.fetchone()[0] == 0:
-            cur.execute(
-                "INSERT INTO user_stats (data) VALUES (%s)",
-                (json.dumps({}),)
-            )
+        cur.execute(
+            "INSERT INTO user_stats (data) VALUES (%s)",
+            (json.dumps({}),)
+        )
 
         # =====================
-        # AUDIT (kun hvis tom)
+        # AUDIT
         # =====================
-        cur.execute("SELECT COUNT(*) FROM audit")
-        if cur.fetchone()[0] == 0:
-            cur.execute(
-                "INSERT INTO audit (data) VALUES (%s)",
-                (json.dumps([]),)
-            )
+        cur.execute(
+            "INSERT INTO audit (data) VALUES (%s)",
+            (json.dumps([]),)
+        )
 
         conn.commit()
+        print("🔥 DATABASE RESET + SEEDED OK")
+
 
 
 
