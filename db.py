@@ -1,3 +1,20 @@
+import os
+import json
+import psycopg2
+from datetime import datetime
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# =====================
+# CONNECTION
+# =====================
+def get_conn():
+    return psycopg2.connect(DATABASE_URL, sslmode="require")
+
+
+# =====================
+# INIT
+# =====================
 def init_db():
     with get_conn() as conn:
         cur = conn.cursor()
@@ -108,4 +125,165 @@ def init_db():
             )
 
         conn.commit()
-        print("✅ init_db() OK – ingen data slettet")
+        print("✅ init_db() OK – data bevares")
+
+
+# =====================
+# SESSIONS
+# =====================
+def load_sessions():
+    with get_conn() as conn:
+        cur = conn.cursor()
+
+        cur.execute("SELECT value FROM meta WHERE key='current'")
+        row = cur.fetchone()
+        current = row[0] if row else None
+
+        cur.execute("SELECT data FROM sessions ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+
+        if row and row[0]:
+            data = row[0]
+        else:
+            data = {"current": None, "sessions": {}}
+
+        data["current"] = current
+        return data
+
+
+def save_sessions(data):
+    with get_conn() as conn:
+        cur = conn.cursor()
+
+        cur.execute(
+            "INSERT INTO sessions (data) VALUES (%s)",
+            (json.dumps(data),)
+        )
+
+        cur.execute(
+            """
+            INSERT INTO meta (key, value)
+            VALUES ('current', %s)
+            ON CONFLICT (key)
+            DO UPDATE SET value = EXCLUDED.value
+            """,
+            (data.get("current"),)
+        )
+
+        conn.commit()
+
+
+# =====================
+# LAGER & PRICES
+# =====================
+def load_lager():
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT data FROM lager ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        return row[0] if row else {}
+
+
+def load_prices():
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT data FROM prices ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        return row[0] if row else {}
+
+
+# =====================
+# USER STATS
+# =====================
+def load_user_stats():
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT data FROM user_stats ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        return row[0] if row else {}
+
+
+def save_user_stats(stats):
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO user_stats (data) VALUES (%s)",
+            (json.dumps(stats),)
+        )
+        conn.commit()
+
+
+# =====================
+# ACCESS / BLOCK
+# =====================
+def load_access():
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT data FROM access ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+
+        if row and row[0]:
+            return row[0]
+        else:
+            return {"users": {}, "blocked": []}
+
+
+def save_access(data):
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO access (data) VALUES (%s)",
+            (json.dumps(data),)
+        )
+        conn.commit()
+
+
+# =====================
+# AUDIT
+# =====================
+def audit_log(action, admin, target):
+    with get_conn() as conn:
+        cur = conn.cursor()
+
+        cur.execute("SELECT data FROM audit ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        events = row[0] if row else []
+
+        events.append({
+            "time": datetime.now().strftime("%d-%m-%Y %H:%M"),
+            "action": action,
+            "admin": admin,
+            "target": target
+        })
+
+        cur.execute(
+            "INSERT INTO audit (data) VALUES (%s)",
+            (json.dumps(events),)
+        )
+        conn.commit()
+
+
+def load_audit():
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT data FROM audit ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        return row[0] if row else []
+
+
+# =====================
+# HELPERS
+# =====================
+def new_order(user, items, user_id=None):
+    return {
+        "id": str(datetime.now().timestamp()),
+        "user": user,
+        "user_id": user_id,
+        "items": items,
+        "total": 0,
+        "time": datetime.now().strftime("%d-%m-%Y %H:%M")
+    }
+
+
+def calc_total(items, prices):
+    return sum(items[i] * prices.get(i, 0) for i in items)
