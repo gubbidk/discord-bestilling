@@ -4,3 +4,4 @@ gunicorn
 discord.py
 flask-socketio
 psycopg2-binary
+eventlet>=0.40.3
