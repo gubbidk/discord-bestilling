@@ -66,13 +66,12 @@
 
         <p>💰 {{ totals.get(name, 0) }} kr</p>
 
-        {% set my_order = None %}
+        {% set ns = namespace(my_order=None) %}
         {% for o in session.orders %}
             {% if o.user_id == user.id %}
-                {% set my_order = o %}
+                {% set ns.my_order = o %}
             {% endif %}
         {% endfor %}
-
         <div class="actions">
 
             {% if my_order %}
