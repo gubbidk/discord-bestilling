@@ -129,7 +129,7 @@
     <div class="lager-grid">
         {% for item, s in lager_status.items() %}
         <div class="lager-item {{ s.level }}">
-            <strong>{{ item }}</strong><br>
+            <strong> {{ item }}</strong><br>
             {{ s.left }} / {{ s.max }}
         </div>
         {% endfor %}
