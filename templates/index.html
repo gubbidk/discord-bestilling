@@ -66,26 +66,6 @@
 
         <p>💰 {{ totals.get(name, 0) }} kr</p>
 
-        {% set has_order = false %}
-        {% for o in session.orders %}
-            {% if o.user_id == user.id %}
-                {% set has_order = true %}
-            {% endif %}
-        {% endfor %}
-
-        <div class="actions">
-            {% if has_order %}
-                <a class="btn" href="/session/{{ name }}">Åbn</a>
-            {% elif session.open and not stats.locked %}
-                <a class="btn green" href="/create_order/{{ name }}">➕ Opret bestilling</a>
-            {% endif %}
-
-            {% if admin %}
-                <a class="btn danger"
-                   href="/delete_session/{{ name }}"
-                   onclick="return confirm('Slet hele bestillingen?')">❌</a>
-            {% endif %}
-        </div>
         {% set my_order = None %}
         {% for o in session.orders %}
             {% if o.user_id == user.id %}
