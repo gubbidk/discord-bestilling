@@ -72,11 +72,12 @@
                 {% set ns.my_order = o %}
             {% endif %}
         {% endfor %}
+
         <div class="actions">
 
             {% if ns.my_order %}
         <!-- 🟢 Brugeren har allerede en ordre -->
-                <a class="btn blue" href="/session/{{ name }}">Åbn</a>
+                <a class="btn blue" href="/edit_own_order/{{ name }}/{{ ns.my_order.id }}">Åbn</a>
 
             {% elif session.open and not stats.locked %}
         <!-- ➕ Ingen ordre endnu -->
@@ -91,7 +92,8 @@
                     href="/delete_session/{{ name }}"
                     onclick="return confirm('Slet hele bestillingen?')">❌</a>
             {% endif %}
-        </div>    
+
+        </div>   
     </div>
 {% endfor %}
 </div>
