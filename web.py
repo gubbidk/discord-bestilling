@@ -640,11 +640,40 @@ def mark_paid(session_name, order_id):
         if o["id"] == order_id
     )
 
+    # hvis allerede betalt → gør intet
+    if order.get("paid"):
+        return redirect(f"/session/{session_name}")
+
+    # marker som betalt
     order["paid"] = True
     save_sessions(data)
 
+    # =====================
+    # 📊 OPDATER USER STATS
+    # =====================
+    stats = load_user_stats()
+    uid = order["user_id"]
+
+    stats.setdefault(uid, {
+        "total_spent": 0,
+        "total_items": 0,
+        "items": {}
+    })
+
+    for item, amount in order["items"].items():
+        if amount > 0:
+            stats[uid]["items"][item] = stats[uid]["items"].get(item, 0) + amount
+            stats[uid]["total_items"] += amount
+
+    stats[uid]["total_spent"] += order.get("total", 0)
+
+    save_user_stats(stats)
+
+    # audit
     audit_log("order_paid", session["user"]["name"], order_id)
+
     return redirect(f"/session/{session_name}")
+
 
 
 @app.route("/admin/order_delivered/<session_name>/<order_id>")
@@ -675,13 +704,44 @@ def order_unpaid(session_name, order_id):
         if o["id"] == order_id
     )
 
+    # hvis ikke betalt → gør intet
+    if not order.get("paid"):
+        return redirect(f"/session/{session_name}")
+
+    # =====================
+    # 📊 RUL STATS TILBAGE
+    # =====================
+    stats = load_user_stats()
+    uid = order["user_id"]
+
+    if uid in stats:
+        for item, amount in order["items"].items():
+            if amount > 0:
+                stats[uid]["items"][item] = stats[uid]["items"].get(item, 0) - amount
+                stats[uid]["total_items"] -= amount
+
+                if stats[uid]["items"][item] <= 0:
+                    del stats[uid]["items"][item]
+
+        stats[uid]["total_spent"] -= order.get("total", 0)
+
+        # sikkerhed
+        if stats[uid]["total_spent"] < 0:
+            stats[uid]["total_spent"] = 0
+        if stats[uid]["total_items"] < 0:
+            stats[uid]["total_items"] = 0
+
+        save_user_stats(stats)
+
+    # marker ordre som ikke betalt
     order["paid"] = False
-    order["delivered"] = False  # sikkerhed
+    order["delivered"] = False
 
     save_sessions(data)
     audit_log("order_unpaid", session["user"]["name"], order_id)
 
     return redirect(f"/session/{session_name}")
+
 
 
 # =========================================================
@@ -761,28 +821,6 @@ def edit_order(session_name, order_id):
 
         order["total"] = total
         save_sessions(data)
-
-        # 🔁 Update user stats
-        if session_name == data["current"]:
-            stats = load_user_stats()
-            uid = order["user_id"]
-
-            stats.setdefault(uid, {
-                "total_spent": 0,
-                "total_items": 0,
-                "items": {}
-            })
-
-            for item in order["items"]:
-                diff = order["items"][item] - before_items.get(item, 0)
-                if diff != 0:
-                    stats[uid]["items"][item] = stats[uid]["items"].get(item, 0) + diff
-                    stats[uid]["total_items"] += diff
-                    if stats[uid]["items"][item] <= 0:
-                        del stats[uid]["items"][item]
-
-            stats[uid]["total_spent"] += (order["total"] - before_total)
-            save_user_stats(stats)
 
         audit_log(
             "edit_order",
