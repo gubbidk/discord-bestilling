@@ -19,59 +19,68 @@ def init_db():
     with get_conn() as conn:
         cur = conn.cursor()
 
+        # 🔥 Drop gamle tabeller (forkert struktur)
+        cur.execute("DROP TABLE IF EXISTS sessions CASCADE")
+        cur.execute("DROP TABLE IF EXISTS access CASCADE")
+        cur.execute("DROP TABLE IF EXISTS lager CASCADE")
+        cur.execute("DROP TABLE IF EXISTS prices CASCADE")
+        cur.execute("DROP TABLE IF EXISTS user_stats CASCADE")
+        cur.execute("DROP TABLE IF EXISTS audit CASCADE")
+        cur.execute("DROP TABLE IF EXISTS meta CASCADE")
+
         # meta
         cur.execute("""
-        CREATE TABLE IF NOT EXISTS meta (
+        CREATE TABLE meta (
             key TEXT PRIMARY KEY,
             value TEXT
         )
         """)
 
-        # sessions (én række med hele strukturen)
+        # sessions – én række med hele datastrukturen
         cur.execute("""
-        CREATE TABLE IF NOT EXISTS sessions (
+        CREATE TABLE sessions (
             id SERIAL PRIMARY KEY,
-            data JSONB
+            data JSONB NOT NULL
         )
         """)
 
         # access
         cur.execute("""
-        CREATE TABLE IF NOT EXISTS access (
+        CREATE TABLE access (
             id SERIAL PRIMARY KEY,
-            data JSONB
+            data JSONB NOT NULL
         )
         """)
 
         # lager
         cur.execute("""
-        CREATE TABLE IF NOT EXISTS lager (
+        CREATE TABLE lager (
             id SERIAL PRIMARY KEY,
-            data JSONB
+            data JSONB NOT NULL
         )
         """)
 
         # prices
         cur.execute("""
-        CREATE TABLE IF NOT EXISTS prices (
+        CREATE TABLE prices (
             id SERIAL PRIMARY KEY,
-            data JSONB
+            data JSONB NOT NULL
         )
         """)
 
         # user stats
         cur.execute("""
-        CREATE TABLE IF NOT EXISTS user_stats (
+        CREATE TABLE user_stats (
             id SERIAL PRIMARY KEY,
-            data JSONB
+            data JSONB NOT NULL
         )
         """)
 
-        # audit
+        # audit log
         cur.execute("""
-        CREATE TABLE IF NOT EXISTS audit (
+        CREATE TABLE audit (
             id SERIAL PRIMARY KEY,
-            data JSONB
+            data JSONB NOT NULL
         )
         """)
 
@@ -79,46 +88,36 @@ def init_db():
         cur.execute("""
         INSERT INTO meta (key, value)
         VALUES ('current', NULL)
-        ON CONFLICT (key) DO NOTHING
         """)
 
-        # 🔰 sikre én default række i hver tabel hvis tom
-        cur.execute("SELECT COUNT(*) FROM sessions")
-        if cur.fetchone()[0] == 0:
-            cur.execute(
-                "INSERT INTO sessions (data) VALUES (%s)",
-                (json.dumps({"current": None, "sessions": {}}),)
-            )
+        # default rows
+        cur.execute(
+            "INSERT INTO sessions (data) VALUES (%s)",
+            (json.dumps({"current": None, "sessions": {}}),)
+        )
 
-        cur.execute("SELECT COUNT(*) FROM access")
-        if cur.fetchone()[0] == 0:
-            cur.execute(
-                "INSERT INTO access (data) VALUES (%s)",
-                (json.dumps({"users": {}, "blocked": []}),)
-            )
+        cur.execute(
+            "INSERT INTO access (data) VALUES (%s)",
+            (json.dumps({"users": {}, "blocked": []}),)
+        )
 
-        cur.execute("SELECT COUNT(*) FROM lager")
-        if cur.fetchone()[0] == 0:
-            cur.execute(
-                "INSERT INTO lager (data) VALUES (%s)",
-                (json.dumps({}),)
-            )
+        cur.execute(
+            "INSERT INTO lager (data) VALUES (%s)",
+            (json.dumps({}),)
+        )
 
-        cur.execute("SELECT COUNT(*) FROM prices")
-        if cur.fetchone()[0] == 0:
-            cur.execute(
-                "INSERT INTO prices (data) VALUES (%s)",
-                (json.dumps({}),)
-            )
+        cur.execute(
+            "INSERT INTO prices (data) VALUES (%s)",
+            (json.dumps({}),)
+        )
 
-        cur.execute("SELECT COUNT(*) FROM user_stats")
-        if cur.fetchone()[0] == 0:
-            cur.execute(
-                "INSERT INTO user_stats (data) VALUES (%s)",
-                (json.dumps({}),)
-            )
+        cur.execute(
+            "INSERT INTO user_stats (data) VALUES (%s)",
+            (json.dumps({}),)
+        )
 
         conn.commit()
+
 
 
 
