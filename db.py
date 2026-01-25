@@ -17,68 +17,73 @@ def get_conn():
 # =====================
 def init_db():
     with get_conn() as conn:
-        with conn.cursor() as c:
+        cur = conn.cursor()
 
-            c.execute("""
-            CREATE TABLE IF NOT EXISTS meta (
-                key TEXT PRIMARY KEY,
-                value JSONB
-            )
-            """)
+        # meta table
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS meta (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+        """)
 
-            c.execute("""
-            CREATE TABLE IF NOT EXISTS sessions (
-                name TEXT PRIMARY KEY,
-                open BOOLEAN,
-                data JSONB
-            )
-            """)
+        # sessions table
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            id SERIAL PRIMARY KEY,
+            data JSONB
+        )
+        """)
 
-            c.execute("""
-            CREATE TABLE IF NOT EXISTS lager (
-                item TEXT PRIMARY KEY,
-                amount INTEGER
-            )
-            """)
+        # access table
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS access (
+            id SERIAL PRIMARY KEY,
+            data JSONB
+        )
+        """)
 
-            c.execute("""
-            CREATE TABLE IF NOT EXISTS prices (
-                item TEXT PRIMARY KEY,
-                price INTEGER
-            )
-            """)
+        # lager table
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS lager (
+            id SERIAL PRIMARY KEY,
+            data JSONB
+        )
+        """)
 
-            c.execute("""
-            CREATE TABLE IF NOT EXISTS user_stats (
-                user_id TEXT PRIMARY KEY,
-                data JSONB
-            )
-            """)
+        # prices table
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS prices (
+            id SERIAL PRIMARY KEY,
+            data JSONB
+        )
+        """)
 
-            c.execute("""
-            CREATE TABLE IF NOT EXISTS access (
-                user_id TEXT PRIMARY KEY,
-                data JSONB
-            )
-            """)
+        # user stats
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_stats (
+            id SERIAL PRIMARY KEY,
+            data JSONB
+        )
+        """)
 
-            c.execute("""
-            CREATE TABLE IF NOT EXISTS blocked (
-                user_id TEXT PRIMARY KEY
-            )
-            """)
+        # audit log
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS audit (
+            id SERIAL PRIMARY KEY,
+            data JSONB
+        )
+        """)
 
-            c.execute("""
-            CREATE TABLE IF NOT EXISTS audit (
-                id SERIAL PRIMARY KEY,
-                time TEXT,
-                action TEXT,
-                admin TEXT,
-                target TEXT
-            )
-            """)
+        # 🔑 sikre default meta rows
+        cur.execute("""
+        INSERT INTO meta (key, value)
+        VALUES ('current', NULL)
+        ON CONFLICT (key) DO NOTHING
+        """)
 
         conn.commit()
+
 
 
 # =====================
@@ -87,29 +92,27 @@ def init_db():
 
 def load_sessions():
     with get_conn() as conn:
-        c = conn.cursor()
+        cur = conn.cursor()
 
-        cur = c.execute("SELECT value FROM meta WHERE key='current'").fetchone()
-        current = None if not cur else cur[0]
+        cur.execute("SELECT value FROM meta WHERE key='current'")
+        row = cur.fetchone()
 
-        sessions = {}
-        for name, open_, data in c.execute("SELECT name, open, data FROM sessions"):
-            s = data
-            s["open"] = bool(open_)
-            s.setdefault("orders", [])
-            s.setdefault("locked_users", [])
+        current = row[0] if row else None
 
-            # 🔧 VIGTIGT: FIX GAMLE ORDRER
-            for o in s["orders"]:
-                o.setdefault("paid", False)
-                o.setdefault("delivered", False)
+        cur.execute("SELECT data FROM sessions ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
 
-            sessions[name] = s
+        if row and row[0]:
+            data = row[0]
+        else:
+            data = {
+                "current": None,
+                "sessions": {}
+            }
 
-        return {
-            "current": current,
-            "sessions": sessions
-        }
+        data["current"] = current
+        return data
+
 
 
 
