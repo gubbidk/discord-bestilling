@@ -18,7 +18,8 @@ from db import (
     load_user_stats,
     save_user_stats,
     audit_log,
-    load_audit
+    load_audit,
+    reset_all_stats      # 👈 TILFØJ DENNE
 )
 
 
@@ -671,7 +672,15 @@ def mark_paid(session_name, order_id):
 
     return redirect(f"/session/{session_name}")
 
+@app.route("/admin/reset_stats")
+def reset_stats():
+    if not is_admin():
+        return "Forbidden", 403
 
+    reset_all_stats()
+    audit_log("reset_stats", session["user"]["name"], "ALL_USERS")
+
+    return redirect("/admin")
 
 @app.route("/admin/order_delivered/<session_name>/<order_id>")
 def mark_delivered(session_name, order_id):

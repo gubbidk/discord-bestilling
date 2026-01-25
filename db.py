@@ -270,6 +270,21 @@ def load_audit():
         row = cur.fetchone()
         return row[0] if row else []
 
+def reset_all_stats():
+    with get_conn() as conn:
+        cur = conn.cursor()
+
+        # Slet alle stats
+        cur.execute("DELETE FROM user_stats")
+
+        # Opret tom stats igen
+        cur.execute(
+            "INSERT INTO user_stats (data) VALUES (%s)",
+            (json.dumps({}),)
+        )
+
+        conn.commit()
+
 
 # =====================
 # HELPERS
