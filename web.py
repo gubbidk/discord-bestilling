@@ -41,8 +41,10 @@ OAUTH_REDIRECT = "/auth/callback"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "dev-secret")
 socketio = SocketIO(app, cors_allowed_origins="*")
-with app.app_context():
-    init_db()
+if os.getenv("RUN_INIT") == "true":
+    with app.app_context():
+        init_db()
+
 # =====================
 # HELPERS
 # =====================
