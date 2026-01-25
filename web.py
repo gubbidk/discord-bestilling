@@ -38,12 +38,16 @@ OAUTH_REDIRECT = "/auth/callback"
 # =====================
 # FLASK
 # =====================
+if os.getenv("RUN_INIT") == "true":
+    print("🔥 RUN_INIT=true → init_db() kører NU")
+    with app.app_context():
+        init_db()
+else:
+    print("ℹ️ RUN_INIT ikke aktiv – init_db springes over")
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "dev-secret")
 socketio = SocketIO(app, cors_allowed_origins="*")
-if os.getenv("RUN_INIT") == "true":
-    with app.app_context():
-        init_db()
+
 
 # =====================
 # HELPERS
