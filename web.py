@@ -141,6 +141,14 @@ def login():
         + urlencode(params)
     )
 
+@app.route("/debug_db")
+def debug_db():
+    return jsonify({
+        "sessions": load_sessions(),
+        "lager": load_lager(),
+        "prices": load_prices(),
+        "access": load_access(),
+    })
 
 @app.route("/auth/callback")
 def auth_callback():
