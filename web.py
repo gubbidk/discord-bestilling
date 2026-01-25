@@ -61,7 +61,13 @@ def get_user_statistics(uid):
         "items": {}
     })
 
-    most_bought = max(stats["items"], key=stats["items"].get) if stats["items"] else None
+    filtered_items = {
+        item: amount
+        for item, amount in stats["items"].items()
+        if item.lower() != "veste"
+    }
+
+    most_bought = max(filtered_items, key=filtered_items.get) if filtered_items else None
 
     sessions = load_sessions()
     locked = False
