@@ -19,7 +19,7 @@ def init_db():
     with get_conn() as conn:
         cur = conn.cursor()
 
-        # meta table
+        # meta
         cur.execute("""
         CREATE TABLE IF NOT EXISTS meta (
             key TEXT PRIMARY KEY,
@@ -27,7 +27,7 @@ def init_db():
         )
         """)
 
-        # sessions table
+        # sessions (én række med hele strukturen)
         cur.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             id SERIAL PRIMARY KEY,
@@ -35,7 +35,7 @@ def init_db():
         )
         """)
 
-        # access table
+        # access
         cur.execute("""
         CREATE TABLE IF NOT EXISTS access (
             id SERIAL PRIMARY KEY,
@@ -43,7 +43,7 @@ def init_db():
         )
         """)
 
-        # lager table
+        # lager
         cur.execute("""
         CREATE TABLE IF NOT EXISTS lager (
             id SERIAL PRIMARY KEY,
@@ -51,7 +51,7 @@ def init_db():
         )
         """)
 
-        # prices table
+        # prices
         cur.execute("""
         CREATE TABLE IF NOT EXISTS prices (
             id SERIAL PRIMARY KEY,
@@ -67,7 +67,7 @@ def init_db():
         )
         """)
 
-        # audit log
+        # audit
         cur.execute("""
         CREATE TABLE IF NOT EXISTS audit (
             id SERIAL PRIMARY KEY,
@@ -75,14 +75,51 @@ def init_db():
         )
         """)
 
-        # 🔑 sikre default meta rows
+        # default meta
         cur.execute("""
         INSERT INTO meta (key, value)
         VALUES ('current', NULL)
         ON CONFLICT (key) DO NOTHING
         """)
 
+        # 🔰 sikre én default række i hver tabel hvis tom
+        cur.execute("SELECT COUNT(*) FROM sessions")
+        if cur.fetchone()[0] == 0:
+            cur.execute(
+                "INSERT INTO sessions (data) VALUES (%s)",
+                (json.dumps({"current": None, "sessions": {}}),)
+            )
+
+        cur.execute("SELECT COUNT(*) FROM access")
+        if cur.fetchone()[0] == 0:
+            cur.execute(
+                "INSERT INTO access (data) VALUES (%s)",
+                (json.dumps({"users": {}, "blocked": []}),)
+            )
+
+        cur.execute("SELECT COUNT(*) FROM lager")
+        if cur.fetchone()[0] == 0:
+            cur.execute(
+                "INSERT INTO lager (data) VALUES (%s)",
+                (json.dumps({}),)
+            )
+
+        cur.execute("SELECT COUNT(*) FROM prices")
+        if cur.fetchone()[0] == 0:
+            cur.execute(
+                "INSERT INTO prices (data) VALUES (%s)",
+                (json.dumps({}),)
+            )
+
+        cur.execute("SELECT COUNT(*) FROM user_stats")
+        if cur.fetchone()[0] == 0:
+            cur.execute(
+                "INSERT INTO user_stats (data) VALUES (%s)",
+                (json.dumps({}),)
+            )
+
         conn.commit()
+
 
 
 
@@ -94,11 +131,12 @@ def load_sessions():
     with get_conn() as conn:
         cur = conn.cursor()
 
+        # hent current session navn
         cur.execute("SELECT value FROM meta WHERE key='current'")
         row = cur.fetchone()
-
         current = row[0] if row else None
 
+        # hent seneste sessions-data
         cur.execute("SELECT data FROM sessions ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
 
@@ -112,6 +150,7 @@ def load_sessions():
 
         data["current"] = current
         return data
+
 
 
 
