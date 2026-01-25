@@ -229,32 +229,32 @@ def save_user_stats(stats):
 # =====================
 def load_access():
     with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("SELECT user_id, data FROM access")
-            users = {uid: data for uid, data in c.fetchall()}
+        cur = conn.cursor()
 
-            c.execute("SELECT user_id FROM blocked")
-            blocked = [uid for (uid,) in c.fetchall()]
+        # hent seneste access-data
+        cur.execute("SELECT data FROM access ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
 
-            return {"users": users, "blocked": blocked}
+        if row and row[0]:
+            return row[0]
+        else:
+            return {
+                "users": {},
+                "blocked": []
+            }
+
 
 
 def save_access(data):
     with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("DELETE FROM access")
-            c.execute("DELETE FROM blocked")
+        cur = conn.cursor()
 
-            for uid, udata in data["users"].items():
-                c.execute(
-                    "INSERT INTO access (user_id, data) VALUES (%s, %s)",
-                    (uid, json.dumps(udata))
-                )
+        cur.execute(
+            "INSERT INTO access (data) VALUES (%s)",
+            (json.dumps(data),)
+        )
 
-            for uid in data["blocked"]:
-                c.execute("INSERT INTO blocked (user_id) VALUES (%s)", (uid,))
         conn.commit()
-
 
 # =====================
 # AUDIT
