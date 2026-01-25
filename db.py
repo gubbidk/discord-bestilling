@@ -2,21 +2,36 @@ import os
 import json
 import psycopg2
 from datetime import datetime
+from psycopg2.pool import SimpleConnectionPool
 
+# =====================
+# CONFIG
+# =====================
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# 🔥 GLOBAL CONNECTION POOL
+pool = SimpleConnectionPool(
+    minconn=1,
+    maxconn=10,
+    dsn=DATABASE_URL,
+    sslmode="require"
+)
+
 # =====================
-# CONNECTION
+# CONNECTION HELPERS
 # =====================
 def get_conn():
-    return psycopg2.connect(DATABASE_URL, sslmode="require")
+    return pool.getconn()
 
+def release_conn(conn):
+    pool.putconn(conn)
 
 # =====================
-# INIT
+# INIT (KØRES KUN ÉN GANG)
 # =====================
 def init_db():
-    with get_conn() as conn:
+    conn = get_conn()
+    try:
         cur = conn.cursor()
 
         # =====================
@@ -125,14 +140,17 @@ def init_db():
             )
 
         conn.commit()
-        print("✅ init_db() OK – data bevares")
+        print("✅ init_db() OK – database klar og data bevaret")
 
+    finally:
+        release_conn(conn)
 
 # =====================
 # SESSIONS
 # =====================
 def load_sessions():
-    with get_conn() as conn:
+    conn = get_conn()
+    try:
         cur = conn.cursor()
 
         cur.execute("SELECT value FROM meta WHERE key='current'")
@@ -150,9 +168,12 @@ def load_sessions():
         data["current"] = current
         return data
 
+    finally:
+        release_conn(conn)
 
 def save_sessions(data):
-    with get_conn() as conn:
+    conn = get_conn()
+    try:
         cur = conn.cursor()
 
         cur.execute(
@@ -160,89 +181,110 @@ def save_sessions(data):
             (json.dumps(data),)
         )
 
-        cur.execute(
-            """
+        cur.execute("""
             INSERT INTO meta (key, value)
             VALUES ('current', %s)
             ON CONFLICT (key)
             DO UPDATE SET value = EXCLUDED.value
-            """,
-            (data.get("current"),)
-        )
+        """, (data.get("current"),))
 
         conn.commit()
 
+    finally:
+        release_conn(conn)
 
 # =====================
 # LAGER & PRICES
 # =====================
 def load_lager():
-    with get_conn() as conn:
+    conn = get_conn()
+    try:
         cur = conn.cursor()
         cur.execute("SELECT data FROM lager ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
         return row[0] if row else {}
-
+    finally:
+        release_conn(conn)
 
 def load_prices():
-    with get_conn() as conn:
+    conn = get_conn()
+    try:
         cur = conn.cursor()
         cur.execute("SELECT data FROM prices ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
         return row[0] if row else {}
-
+    finally:
+        release_conn(conn)
 
 # =====================
 # USER STATS
 # =====================
 def load_user_stats():
-    with get_conn() as conn:
+    conn = get_conn()
+    try:
         cur = conn.cursor()
         cur.execute("SELECT data FROM user_stats ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
         return row[0] if row else {}
-
+    finally:
+        release_conn(conn)
 
 def save_user_stats(stats):
-    with get_conn() as conn:
+    conn = get_conn()
+    try:
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO user_stats (data) VALUES (%s)",
             (json.dumps(stats),)
         )
         conn.commit()
+    finally:
+        release_conn(conn)
 
+def reset_all_stats():
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM user_stats")
+        cur.execute(
+            "INSERT INTO user_stats (data) VALUES (%s)",
+            (json.dumps({}),)
+        )
+        conn.commit()
+    finally:
+        release_conn(conn)
 
 # =====================
 # ACCESS / BLOCK
 # =====================
 def load_access():
-    with get_conn() as conn:
+    conn = get_conn()
+    try:
         cur = conn.cursor()
         cur.execute("SELECT data FROM access ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
-
-        if row and row[0]:
-            return row[0]
-        else:
-            return {"users": {}, "blocked": []}
-
+        return row[0] if row else {"users": {}, "blocked": []}
+    finally:
+        release_conn(conn)
 
 def save_access(data):
-    with get_conn() as conn:
+    conn = get_conn()
+    try:
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO access (data) VALUES (%s)",
             (json.dumps(data),)
         )
         conn.commit()
-
+    finally:
+        release_conn(conn)
 
 # =====================
 # AUDIT
 # =====================
 def audit_log(action, admin, target):
-    with get_conn() as conn:
+    conn = get_conn()
+    try:
         cur = conn.cursor()
 
         cur.execute("SELECT data FROM audit ORDER BY id DESC LIMIT 1")
@@ -260,31 +302,21 @@ def audit_log(action, admin, target):
             "INSERT INTO audit (data) VALUES (%s)",
             (json.dumps(events),)
         )
+
         conn.commit()
 
+    finally:
+        release_conn(conn)
 
 def load_audit():
-    with get_conn() as conn:
+    conn = get_conn()
+    try:
         cur = conn.cursor()
         cur.execute("SELECT data FROM audit ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
         return row[0] if row else []
-
-def reset_all_stats():
-    with get_conn() as conn:
-        cur = conn.cursor()
-
-        # Slet alle stats
-        cur.execute("DELETE FROM user_stats")
-
-        # Opret tom stats igen
-        cur.execute(
-            "INSERT INTO user_stats (data) VALUES (%s)",
-            (json.dumps({}),)
-        )
-
-        conn.commit()
-
+    finally:
+        release_conn(conn)
 
 # =====================
 # HELPERS
@@ -298,7 +330,6 @@ def new_order(user, items, user_id=None):
         "total": 0,
         "time": datetime.now().strftime("%d-%m-%Y %H:%M")
     }
-
 
 def calc_total(items, prices):
     return sum(items[i] * prices.get(i, 0) for i in items)
