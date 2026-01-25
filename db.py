@@ -19,7 +19,7 @@ def init_db():
     with get_conn() as conn:
         cur = conn.cursor()
 
-        # 🔥 Drop gamle tabeller (forkert struktur)
+        # Drop alt for ren start
         cur.execute("DROP TABLE IF EXISTS sessions CASCADE")
         cur.execute("DROP TABLE IF EXISTS access CASCADE")
         cur.execute("DROP TABLE IF EXISTS lager CASCADE")
@@ -36,147 +36,70 @@ def init_db():
         )
         """)
 
-        # sessions – én række med hele datastrukturen
-        cur.execute("""
-        CREATE TABLE sessions (
-            id SERIAL PRIMARY KEY,
-            data JSONB NOT NULL
-        )
-        """)
-
-        # access
-        cur.execute("""
-        CREATE TABLE access (
-            id SERIAL PRIMARY KEY,
-            data JSONB NOT NULL
-        )
-        """)
-
-        # lager
-        cur.execute("""
-        CREATE TABLE lager (
-            id SERIAL PRIMARY KEY,
-            data JSONB NOT NULL
-        )
-        """)
-
-        # prices
-        cur.execute("""
-        CREATE TABLE prices (
-            id SERIAL PRIMARY KEY,
-            data JSONB NOT NULL
-        )
-        """)
-
-        # user stats
-        cur.execute("""
-        CREATE TABLE user_stats (
-            id SERIAL PRIMARY KEY,
-            data JSONB NOT NULL
-        )
-        """)
-
-        # audit log
-        cur.execute("""
-        CREATE TABLE audit (
-            id SERIAL PRIMARY KEY,
-            data JSONB NOT NULL
-        )
-        """)
+        # JSON-tabeller
+        for table in ["sessions", "access", "lager", "prices", "user_stats", "audit"]:
+            cur.execute(f"""
+            CREATE TABLE {table} (
+                id SERIAL PRIMARY KEY,
+                data JSONB NOT NULL
+            )
+            """)
 
         # default meta
-        cur.execute("""
-        INSERT INTO meta (key, value)
-        VALUES ('current', NULL)
-        """)
+        cur.execute("INSERT INTO meta (key, value) VALUES ('current', NULL)")
 
-        # default rows
-        cur.execute(
-            "INSERT INTO sessions (data) VALUES (%s)",
-            (json.dumps({"current": None, "sessions": {}}),)
-        )
-
-        cur.execute(
-            "INSERT INTO access (data) VALUES (%s)",
-            (json.dumps({"users": {}, "blocked": []}),)
-        )
-
-        cur.execute(
-            "INSERT INTO lager (data) VALUES (%s)",
-            (json.dumps({}),)
-        )
-
-        cur.execute(
-            "INSERT INTO prices (data) VALUES (%s)",
-            (json.dumps({}),)
-        )
-
-        cur.execute(
-            "INSERT INTO user_stats (data) VALUES (%s)",
-            (json.dumps({}),)
-        )
+        # default data
+        cur.execute("INSERT INTO sessions (data) VALUES (%s)", (json.dumps({"current": None, "sessions": {}}),))
+        cur.execute("INSERT INTO access (data) VALUES (%s)", (json.dumps({"users": {}, "blocked": []}),))
+        cur.execute("INSERT INTO lager (data) VALUES (%s)", (json.dumps({}),))
+        cur.execute("INSERT INTO prices (data) VALUES (%s)", (json.dumps({}),))
+        cur.execute("INSERT INTO user_stats (data) VALUES (%s)", (json.dumps({}),))
+        cur.execute("INSERT INTO audit (data) VALUES (%s)", (json.dumps([]),))
 
         conn.commit()
 
 
-
-
-
 # =====================
-# SESSIONS FUCK AEJJEJEADADAERTGGG
+# SESSIONS
 # =====================
-
 def load_sessions():
     with get_conn() as conn:
         cur = conn.cursor()
 
-        # hent current session navn
         cur.execute("SELECT value FROM meta WHERE key='current'")
         row = cur.fetchone()
         current = row[0] if row else None
 
-        # hent seneste sessions-data
         cur.execute("SELECT data FROM sessions ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
 
         if row and row[0]:
             data = row[0]
         else:
-            data = {
-                "current": None,
-                "sessions": {}
-            }
+            data = {"current": None, "sessions": {}}
 
         data["current"] = current
         return data
 
 
-
-
-
 def save_sessions(data):
     with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("DELETE FROM sessions")
+        cur = conn.cursor()
 
-            for name, s in data["sessions"].items():
-                c.execute(
-                    """
-                    INSERT INTO sessions (name, open, data)
-                    VALUES (%s, %s, %s)
-                    """,
-                    (name, s.get("open", False), json.dumps(s))
-                )
+        cur.execute(
+            "INSERT INTO sessions (data) VALUES (%s)",
+            (json.dumps(data),)
+        )
 
-            c.execute(
-                """
-                INSERT INTO meta (key, value)
-                VALUES ('current', %s)
-                ON CONFLICT (key)
-                DO UPDATE SET value = EXCLUDED.value
-                """,
-                (json.dumps(data.get("current")),)
-            )
+        cur.execute(
+            """
+            INSERT INTO meta (key, value)
+            VALUES ('current', %s)
+            ON CONFLICT (key)
+            DO UPDATE SET value = EXCLUDED.value
+            """,
+            (data.get("current"),)
+        )
 
         conn.commit()
 
@@ -186,16 +109,18 @@ def save_sessions(data):
 # =====================
 def load_lager():
     with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("SELECT item, amount FROM lager")
-            return dict(c.fetchall())
+        cur = conn.cursor()
+        cur.execute("SELECT data FROM lager ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        return row[0] if row else {}
 
 
 def load_prices():
     with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("SELECT item, price FROM prices")
-            return dict(c.fetchall())
+        cur = conn.cursor()
+        cur.execute("SELECT data FROM prices ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        return row[0] if row else {}
 
 
 # =====================
@@ -203,24 +128,21 @@ def load_prices():
 # =====================
 def load_user_stats():
     with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("SELECT user_id, data FROM user_stats")
-            return {uid: data for uid, data in c.fetchall()}
+        cur = conn.cursor()
+        cur.execute("SELECT data FROM user_stats ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        return row[0] if row else {}
 
 
 def save_user_stats(stats):
     with get_conn() as conn:
-        with conn.cursor() as c:
-            for uid, data in stats.items():
-                c.execute(
-                    """
-                    INSERT INTO user_stats (user_id, data)
-                    VALUES (%s, %s)
-                    ON CONFLICT (user_id)
-                    DO UPDATE SET data = EXCLUDED.data
-                    """,
-                    (uid, json.dumps(data))
-                )
+        cur = conn.cursor()
+
+        cur.execute(
+            "INSERT INTO user_stats (data) VALUES (%s)",
+            (json.dumps(stats),)
+        )
+
         conn.commit()
 
 
@@ -230,19 +152,13 @@ def save_user_stats(stats):
 def load_access():
     with get_conn() as conn:
         cur = conn.cursor()
-
-        # hent seneste access-data
         cur.execute("SELECT data FROM access ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
 
         if row and row[0]:
             return row[0]
         else:
-            return {
-                "users": {},
-                "blocked": []
-            }
-
+            return {"users": {}, "blocked": []}
 
 
 def save_access(data):
@@ -256,49 +172,40 @@ def save_access(data):
 
         conn.commit()
 
+
 # =====================
 # AUDIT
 # =====================
 def audit_log(action, admin, target):
     with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute(
-                """
-                INSERT INTO audit (time, action, admin, target)
-                VALUES (%s, %s, %s, %s)
-                """,
-                (
-                    datetime.now().strftime("%d-%m-%Y %H:%M"),
-                    action,
-                    admin,
-                    target
-                )
-            )
+        cur = conn.cursor()
+
+        cur.execute("SELECT data FROM audit ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+
+        events = row[0] if row else []
+
+        events.append({
+            "time": datetime.now().strftime("%d-%m-%Y %H:%M"),
+            "action": action,
+            "admin": admin,
+            "target": target
+        })
+
+        cur.execute(
+            "INSERT INTO audit (data) VALUES (%s)",
+            (json.dumps(events),)
+        )
+
         conn.commit()
-    return True
 
 
 def load_audit():
     with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute(
-                """
-                SELECT time, action, admin, target
-                FROM audit
-                ORDER BY id DESC
-                """
-            )
-            rows = c.fetchall()
-
-    return [
-        {
-            "time": time,
-            "action": action,
-            "admin": admin,
-            "target": target
-        }
-        for time, action, admin, target in rows
-    ]
+        cur = conn.cursor()
+        cur.execute("SELECT data FROM audit ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        return row[0] if row else []
 
 
 # =====================
