@@ -39,18 +39,41 @@
             {{ info.last_seen }}
         </p>
 
-       <div class="actions">
+        <div class="actions">
+
+            {# 🔒 BLOCK / UNBLOCK #}
             {% if uid in blocked %}
                 <a class="btn success" href="/admin/unblock/{{ uid }}">🔓</a>
             {% else %}
                 <a class="btn danger" href="/admin/block/{{ uid }}">⛔</a>
             {% endif %}
 
-                <a class="btn blue"
-                href="/admin/user_history?uid={{ uid }}">
-                📜 Historik
-                </a>
-            </div>
+            {# 📜 HISTORIK #}
+            <a class="btn blue"
+               href="/admin/user_history?uid={{ uid }}">
+               📜 Historik
+            </a>
+
+            {# 👑 OWNER ADMIN CONTROL #}
+            {% if is_owner and uid != current_user_id %}
+
+                {% if info.role != "admin" %}
+                    <a class="btn green"
+                       href="/owner/make_admin/{{ uid }}"
+                       onclick="return confirm('Gør {{ info.name }} til admin?')">
+                       👑 Gør admin
+                    </a>
+                {% else %}
+                    <a class="btn danger"
+                       href="/owner/remove_admin/{{ uid }}"
+                       onclick="return confirm('Fjern admin fra {{ info.name }}?')">
+                       ❌ Fjern admin
+                    </a>
+                {% endif %}
+
+            {% endif %}
+
+        </div>
     </div>
 {% endfor %}
 </div>

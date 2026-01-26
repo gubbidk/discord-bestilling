@@ -109,6 +109,12 @@ def get_lager_status_for_session(session_name):
         }
     return status
 
+def is_owner():
+    return (
+        "user" in session and
+        session["user"]["id"] == os.getenv("OWNER_DISCORD_ID")
+    )
+
 # =====================
 # BLOCK ENFORCEMENT
 # =====================
@@ -360,6 +366,52 @@ def block_user(uid):
 
     return redirect("/admin/users")
 
+@app.route("/owner/make_admin/<uid>")
+def make_admin(uid):
+    if not is_owner():
+        return "Kun ejer kan gøre dette", 403
+
+    access = load_access()
+
+    user = access["users"].get(uid)
+    if not user:
+        return redirect("/admin/users")
+
+    # gør til admin
+    user["role"] = "admin"
+    save_access(access)
+
+    audit_log("make_admin", session["user"]["name"], uid)
+
+    return redirect("/admin/users")
+
+
+# =========================================================
+# 👑 OWNER – FJERN ADMIN
+# =========================================================
+@app.route("/owner/remove_admin/<uid>")
+def remove_admin(uid):
+    if not is_owner():
+        return "Kun ejer kan gøre dette", 403
+
+    # kan ikke fjerne dig selv
+    if uid == session["user"]["id"]:
+        return "Du kan ikke fjerne dig selv som admin", 403
+
+    access = load_access()
+
+    user = access["users"].get(uid)
+    if not user:
+        return redirect("/admin/users")
+
+    # gør til normal user
+    user["role"] = "user"
+    save_access(access)
+
+    audit_log("remove_admin", session["user"]["name"], uid)
+
+    return redirect("/admin/users")
+
 
 @app.route("/admin/unblock/<uid>")
 def unblock_user(uid):
@@ -392,7 +444,9 @@ def admin_users():
         users=users,
         blocked=access["blocked"],
         admin=True,
-        user=session["user"]
+        user=session["user"],
+        is_owner=is_owner(),                 
+        current_user_id=session["user"]["id"] 
     )
 
 @app.route("/admin/user_history")
@@ -573,6 +627,7 @@ def edit_own_order(session_name, order_id):
 
     # 🔒 LÅS HVIS BETALT ELLER LEVERET
     if order.get("paid") or order.get("delivered"):
+
         return "Ordren er låst og kan ikke redigeres", 403
     if order.get("user_id") != session["user"]["id"]:
         audit_log(
