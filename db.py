@@ -14,45 +14,63 @@ pool = None
 
 def create_pool():
     global pool
-    pool = SimpleConnectionPool(
-        minconn=1,
-        maxconn=10,
-        dsn=DATABASE_URL,
-        sslmode="require",
-        connect_timeout=5
-    )
-    print("✅ DB pool oprettet")
+    try:
+        pool = SimpleConnectionPool(
+            minconn=1,
+            maxconn=10,
+            dsn=DATABASE_URL,
+            sslmode="require",
+            connect_timeout=5
+        )
+        print("✅ DB pool oprettet")
+    except Exception as e:
+        print("❌ Kunne ikke oprette DB pool:", e)
+        pool = None
 
 create_pool()
 
 # =====================
-# CONNECTION HELPERS (SIKKER)
+# CONNECTION HELPERS (BOMBESTABIL)
 # =====================
 def get_conn():
     global pool
 
-    for _ in range(3):  # prøv 3 gange
+    for _ in range(5):
         try:
+            if pool is None:
+                create_pool()
+
             conn = pool.getconn()
             conn.autocommit = False
             return conn
+
         except psycopg2.OperationalError:
             print("♻️ DB connection død – prøver igen...")
             time.sleep(0.2)
-
-        except Exception:
-            print("♻️ DB pool fejl – genskaber pool...")
             create_pool()
+
+        except Exception as e:
+            print("♻️ DB pool fejl:", e)
             time.sleep(0.2)
+            create_pool()
 
-    raise Exception("❌ Kunne ikke oprette database-forbindelse")
+    raise Exception("❌ Kunne ikke oprette database-forbindelse efter retries")
 
 
-def release_conn(conn):
+def release_conn(conn, broken=False):
+    global pool
+
     try:
-        pool.putconn(conn)
+        if broken:
+            # 🔥 smid død forbindelse væk
+            try:
+                conn.close()
+            except:
+                pass
+        else:
+            pool.putconn(conn)
     except Exception:
-        pass  # ignorer døde forbindelser
+        pass
 
 # =====================
 # INIT
@@ -62,9 +80,7 @@ def init_db():
     try:
         cur = conn.cursor()
 
-        # =====================
         # TABELLER
-        # =====================
         cur.execute("""
         CREATE TABLE IF NOT EXISTS meta (
             key TEXT PRIMARY KEY,
@@ -80,18 +96,14 @@ def init_db():
             )
             """)
 
-        # =====================
         # META
-        # =====================
         cur.execute("""
         INSERT INTO meta (key, value)
         VALUES ('current', NULL)
         ON CONFLICT (key) DO NOTHING
         """)
 
-        # =====================
         # SESSIONS
-        # =====================
         cur.execute("SELECT COUNT(*) FROM sessions")
         if cur.fetchone()[0] == 0:
             cur.execute(
@@ -99,9 +111,7 @@ def init_db():
                 (json.dumps({"current": None, "sessions": {}}),)
             )
 
-        # =====================
         # ACCESS
-        # =====================
         cur.execute("SELECT COUNT(*) FROM access")
         if cur.fetchone()[0] == 0:
             cur.execute(
@@ -109,9 +119,7 @@ def init_db():
                 (json.dumps({"users": {}, "blocked": []}),)
             )
 
-        # =====================
-        # 🔫 LAGER
-        # =====================
+        # LAGER
         cur.execute("SELECT COUNT(*) FROM lager")
         if cur.fetchone()[0] == 0:
             cur.execute(
@@ -128,9 +136,7 @@ def init_db():
                 }),)
             )
 
-        # =====================
-        # 💰 PRISER
-        # =====================
+        # PRISER
         cur.execute("SELECT COUNT(*) FROM prices")
         if cur.fetchone()[0] == 0:
             cur.execute(
@@ -147,25 +153,15 @@ def init_db():
                 }),)
             )
 
-        # =====================
         # USER STATS
-        # =====================
         cur.execute("SELECT COUNT(*) FROM user_stats")
         if cur.fetchone()[0] == 0:
-            cur.execute(
-                "INSERT INTO user_stats (data) VALUES (%s)",
-                (json.dumps({}),)
-            )
+            cur.execute("INSERT INTO user_stats (data) VALUES (%s)", (json.dumps({}),))
 
-        # =====================
         # AUDIT
-        # =====================
         cur.execute("SELECT COUNT(*) FROM audit")
         if cur.fetchone()[0] == 0:
-            cur.execute(
-                "INSERT INTO audit (data) VALUES (%s)",
-                (json.dumps([]),)
-            )
+            cur.execute("INSERT INTO audit (data) VALUES (%s)", (json.dumps([]),))
 
         conn.commit()
         print("✅ init_db() OK – database klar")
@@ -174,34 +170,76 @@ def init_db():
         release_conn(conn)
 
 # =====================
-# GENERIC LOADERS (SIKRE)
+# GENERIC LOADERS (RETRY + SSL SAFE)
 # =====================
 def _load_latest(table, default):
-    conn = get_conn()
-    try:
-        cur = conn.cursor()
-        cur.execute(f"SELECT data FROM {table} ORDER BY id DESC LIMIT 1")
-        row = cur.fetchone()
-        return row[0] if row and row[0] else default
-    finally:
-        release_conn(conn)
+    for _ in range(3):
+        conn = None
+        try:
+            conn = get_conn()
+            cur = conn.cursor()
+            cur.execute(f"SELECT data FROM {table} ORDER BY id DESC LIMIT 1")
+            row = cur.fetchone()
+            return row[0] if row and row[0] else default
+
+        except psycopg2.OperationalError as e:
+            print(f"♻️ SSL fejl på load {table} – retry...", e)
+            if conn:
+                release_conn(conn, broken=True)
+            time.sleep(0.1)
+
+        except Exception as e:
+            print(f"❌ Fejl på load {table}:", e)
+            if conn:
+                release_conn(conn, broken=True)
+            return default
+
+        finally:
+            if conn:
+                try:
+                    release_conn(conn)
+                except:
+                    pass
+
+    return default
 
 
 def _insert(table, data):
-    conn = get_conn()
-    try:
-        cur = conn.cursor()
-        cur.execute(f"INSERT INTO {table} (data) VALUES (%s)", (json.dumps(data),))
-        conn.commit()
-    finally:
-        release_conn(conn)
+    for _ in range(3):
+        conn = None
+        try:
+            conn = get_conn()
+            cur = conn.cursor()
+            cur.execute(f"INSERT INTO {table} (data) VALUES (%s)", (json.dumps(data),))
+            conn.commit()
+            return
+
+        except psycopg2.OperationalError as e:
+            print(f"♻️ SSL fejl på insert {table} – retry...", e)
+            if conn:
+                release_conn(conn, broken=True)
+            time.sleep(0.1)
+
+        except Exception as e:
+            print(f"❌ Fejl på insert {table}:", e)
+            if conn:
+                release_conn(conn, broken=True)
+            return
+
+        finally:
+            if conn:
+                try:
+                    release_conn(conn)
+                except:
+                    pass
 
 # =====================
 # API FUNKTIONER
 # =====================
 def load_sessions():
-    conn = get_conn()
+    conn = None
     try:
+        conn = get_conn()
         cur = conn.cursor()
 
         cur.execute("SELECT value FROM meta WHERE key='current'")
@@ -214,13 +252,20 @@ def load_sessions():
         data = row[0] if row and row[0] else {"current": None, "sessions": {}}
         data["current"] = current
         return data
+
+    except psycopg2.OperationalError as e:
+        print("♻️ SSL fejl load_sessions – fallback", e)
+        return {"current": None, "sessions": {}}
+
     finally:
-        release_conn(conn)
+        if conn:
+            release_conn(conn)
 
 
 def save_sessions(data):
-    conn = get_conn()
+    conn = None
     try:
+        conn = get_conn()
         cur = conn.cursor()
 
         cur.execute("INSERT INTO sessions (data) VALUES (%s)", (json.dumps(data),))
@@ -233,8 +278,13 @@ def save_sessions(data):
         """, (data.get("current"),))
 
         conn.commit()
+
+    except psycopg2.OperationalError as e:
+        print("♻️ SSL fejl save_sessions – ignoreret", e)
+
     finally:
-        release_conn(conn)
+        if conn:
+            release_conn(conn)
 
 
 def load_lager():
