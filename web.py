@@ -32,6 +32,7 @@ DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID")
 DISCORD_ADMIN_ROLE = os.getenv("DISCORD_ADMIN_ROLE")
 DISCORD_USER_ROLE = os.getenv("DISCORD_USER_ROLE")
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_TOKEN")
+OWNER_ID = os.getenv("OWNER_DISCORD_ID")
 
 BASE_URL = "https://discord-bestilling-yfte.onrender.com"
 OAUTH_REDIRECT = "/auth/callback"
@@ -50,7 +51,12 @@ print("🧪 DATABASE_URL =", os.getenv("DATABASE_URL"))
 # HELPERS
 # =====================
 def is_admin():
-    return session.get("admin", False)
+    uid = session.get("user", {}).get("id")
+    if not uid:
+        return False
+
+    role = load_access()["users"].get(uid, {}).get("role")
+    return role == "admin" or is_owner()
 
 def is_blocked(uid):
     return uid in load_access()["blocked"]
@@ -110,10 +116,7 @@ def get_lager_status_for_session(session_name):
     return status
 
 def is_owner():
-    return (
-        "user" in session and
-        session["user"]["id"] == os.getenv("OWNER_DISCORD_ID")
-    )
+    return session.get("user", {}).get("id") == OWNER_ID
 
 # =====================
 # BLOCK ENFORCEMENT
@@ -178,6 +181,7 @@ def auth_callback():
     headers = {"Authorization": f"Bearer {token}"}
     user = requests.get("https://discord.com/api/users/@me", headers=headers).json()
 
+    # tjek at bruger er på serveren
     member = requests.get(
         f"https://discord.com/api/users/@me/guilds/{DISCORD_GUILD_ID}/member",
         headers=headers
@@ -185,6 +189,7 @@ def auth_callback():
     if member.status_code != 200:
         return "Ikke medlem af serveren", 403
 
+    # tjek kun om bruger har adgang (user-rolle)
     roles = member.json()["roles"]
     role_data = requests.get(
         f"https://discord.com/api/guilds/{DISCORD_GUILD_ID}/roles",
@@ -193,39 +198,41 @@ def auth_callback():
 
     role_map = {r["id"]: r["name"] for r in role_data}
 
-    admin = False
     access_ok = False
     for r in roles:
         name = role_map.get(r)
-        if name == DISCORD_ADMIN_ROLE:
-            admin = True
-            access_ok = True
-        if name == DISCORD_USER_ROLE:
+        if name == DISCORD_USER_ROLE or name == DISCORD_ADMIN_ROLE:
             access_ok = True
 
     if not access_ok:
         return "Ingen adgang", 403
 
+    # gem bruger i session
     session["user"] = {
         "id": user["id"],
         "name": user["username"],
         "avatar": user.get("avatar")
     }
-    session["admin"] = admin
 
+    # 🔑 ROLLE KOMMER KUN FRA DATABASEN NU
     access = load_access()
+
+    existing = access["users"].get(user["id"])
+
+    role = existing["role"] if existing else "user"
+
     access["users"][user["id"]] = {
         "name": user["username"],
-        "role": "admin" if admin else "user",
+        "role": role,   # 👈 ALDRIG overskriv automatisk
         "avatar": user.get("avatar"),
-        "first_seen": access["users"].get(user["id"], {}).get(
-            "first_seen", datetime.now().strftime("%d-%m-%Y %H:%M")
-        ),
+        "first_seen": existing.get("first_seen") if existing else datetime.now().strftime("%d-%m-%Y %H:%M"),
         "last_seen": datetime.now().strftime("%d-%m-%Y %H:%M")
     }
+
     save_access(access)
 
     return redirect("/")
+
 
 # =====================
 # ROUTES
@@ -366,10 +373,13 @@ def block_user(uid):
 
     return redirect("/admin/users")
 
+# =====================
+# 👑 OWNER – GIVE ADMIN
+# =====================
 @app.route("/owner/make_admin/<uid>")
-def make_admin(uid):
+def owner_make_admin(uid):
     if not is_owner():
-        return "Kun ejer kan gøre dette", 403
+        return "Forbidden", 403
 
     access = load_access()
 
@@ -377,7 +387,10 @@ def make_admin(uid):
     if not user:
         return redirect("/admin/users")
 
-    # gør til admin
+    # kan ikke ændre sig selv
+    if uid == session["user"]["id"]:
+        return redirect("/admin/users")
+
     user["role"] = "admin"
     save_access(access)
 
@@ -386,17 +399,13 @@ def make_admin(uid):
     return redirect("/admin/users")
 
 
-# =========================================================
+# =====================
 # 👑 OWNER – FJERN ADMIN
-# =========================================================
+# =====================
 @app.route("/owner/remove_admin/<uid>")
-def remove_admin(uid):
+def owner_remove_admin(uid):
     if not is_owner():
-        return "Kun ejer kan gøre dette", 403
-
-    # kan ikke fjerne dig selv
-    if uid == session["user"]["id"]:
-        return "Du kan ikke fjerne dig selv som admin", 403
+        return "Forbidden", 403
 
     access = load_access()
 
@@ -404,7 +413,10 @@ def remove_admin(uid):
     if not user:
         return redirect("/admin/users")
 
-    # gør til normal user
+    # kan ikke fjerne sig selv
+    if uid == session["user"]["id"]:
+        return redirect("/admin/users")
+
     user["role"] = "user"
     save_access(access)
 
