@@ -6,16 +6,22 @@
     <link rel="stylesheet" href="/static/style.css">
     <style>
         .edit-box {
-            max-width: 650px;
+            max-width: 700px;
             margin: auto;
         }
 
         .item-row {
             display: grid;
-            grid-template-columns: 1fr 80px 120px 90px;
-            gap: 10px;
+            grid-template-columns: 1fr 80px 120px 100px;
+            gap: 12px;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .item-name {
+            font-weight: 600;
         }
 
         .item-row input {
@@ -32,17 +38,26 @@
         .stock {
             font-size: 0.9em;
             text-align: right;
+            font-weight: 600;
         }
 
         .stock.ok { color: #2ecc71; }
         .stock.warning { color: #f1c40f; }
-        .stock.danger { color: #e74c3c; font-weight: bold; }
+        .stock.danger { color: #e74c3c; }
 
         .total {
             font-size: 1.4em;
             font-weight: bold;
-            margin-top: 20px;
+            margin-top: 25px;
             text-align: right;
+        }
+
+        .legend {
+            margin-top: 20px;
+            font-size: 0.9em;
+            opacity: 0.7;
+            display: flex;
+            gap: 20px;
         }
     </style>
 </head>
@@ -54,11 +69,11 @@
     <form method="post" id="orderForm">
         {% for item, amount in order["items"].items() %}
 
-        {% set max_amount = lager.get(item, 0) %}
-        {% set level = "danger" if max_amount <= 0 else "warning" if max_amount < 5 else "ok" %}
+        {% set left = remaining.get(item, 0) %}
+        {% set level = "danger" if left <= 0 else "warning" if left < 5 else "ok" %}
 
         <div class="item-row">
-            <span>{{ item }}</span>
+            <span class="item-name">{{ item }}</span>
 
             <input
                 type="number"
@@ -73,7 +88,7 @@
             <span class="price">{{ prices[item] }} kr</span>
 
             <span class="stock {{ level }}">
-                📦 {{ max_amount }}
+                📦 {{ left }} tilbage
             </span>
         </div>
         {% endfor %}
@@ -86,6 +101,12 @@
             💾 Gem ændringer
         </button>
     </form>
+
+    <div class="legend">
+        <span style="color:#2ecc71;">🟢 God beholdning</span>
+        <span style="color:#f1c40f;">🟡 Få tilbage</span>
+        <span style="color:#e74c3c;">🔴 Udsolgt</span>
+    </div>
 </div>
 
 <script>

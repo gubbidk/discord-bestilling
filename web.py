@@ -639,24 +639,33 @@ def edit_own_order(session_name, order_id):
 
     # 🔒 LÅS HVIS BETALT ELLER LEVERET
     if order.get("paid") or order.get("delivered"):
-
         return "Ordren er låst og kan ikke redigeres", 403
-    if order.get("user_id") != session["user"]["id"]:
-        audit_log(
-            "edit_own_order_denied",
-            session["user"]["name"],
-            order_id
-        )
-        return "Forbidden", 403
 
     prices = load_prices()
     lager = load_lager()
 
+    # =====================
+    # 📦 BEREGN LAGERSTATUS FOR DENNE SESSION
+    # =====================
+    used = {}
+    for o in orders:
+        for item, amount in o["items"].items():
+            used[item] = used.get(item, 0) + amount
+
+    remaining = {}
+    for item in lager:
+        # brugt af andre (ikke denne ordre)
+        used_by_others = used.get(item, 0) - order["items"].get(item, 0)
+        remaining[item] = max(0, lager.get(item, 0) - used_by_others)
+
+    # =====================
+    # POST → GEM ÆNDRINGER
+    # =====================
     if request.method == "POST":
         before_items = order["items"].copy()
         before_total = order["total"]
 
-        # 🔁 beregn brugt lager
+        # 🔁 beregn brugt lager igen
         used = {}
         for o in orders:
             for item, amount in o["items"].items():
@@ -665,8 +674,10 @@ def edit_own_order(session_name, order_id):
         total = 0
         for item in order["items"]:
             requested = int(request.form.get(item, 0))
+
             used_by_others = used.get(item, 0) - before_items.get(item, 0)
             max_allowed = max(0, lager.get(item, 0) - used_by_others)
+
             final_amount = min(requested, max_allowed)
 
             order["items"][item] = final_amount
@@ -683,15 +694,20 @@ def edit_own_order(session_name, order_id):
 
         return redirect(f"/session/{session_name}")
 
+    # =====================
+    # GET → VIS FORM + LAGERSTATUS
+    # =====================
     return render_template(
         "edit_order.html",
         order=order,
         prices=prices,
         lager=lager,
+        remaining=remaining,          # 👈 DET VIGTIGE
         session_name=session_name,
         admin=False,
         user=session["user"]
     )
+
 
 
 @app.route("/admin/order_paid/<session_name>/<order_id>")
