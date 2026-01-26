@@ -1,6 +1,7 @@
 import os
 import json
 import psycopg2
+import time
 from datetime import datetime
 from psycopg2.pool import SimpleConnectionPool
 
@@ -25,21 +26,27 @@ def create_pool():
 create_pool()
 
 # =====================
-# CONNECTION HELPERS
+# CONNECTION HELPERS (SIKKER)
 # =====================
 def get_conn():
     global pool
-    try:
-        conn = pool.getconn()
-        conn.autocommit = False
-        return conn
-    except Exception:
-        # 🔥 pool er død → genskab
-        print("♻️ DB pool død – genskaber...")
-        create_pool()
-        conn = pool.getconn()
-        conn.autocommit = False
-        return conn
+
+    for _ in range(3):  # prøv 3 gange
+        try:
+            conn = pool.getconn()
+            conn.autocommit = False
+            return conn
+        except psycopg2.OperationalError:
+            print("♻️ DB connection død – prøver igen...")
+            time.sleep(0.2)
+
+        except Exception:
+            print("♻️ DB pool fejl – genskaber pool...")
+            create_pool()
+            time.sleep(0.2)
+
+    raise Exception("❌ Kunne ikke oprette database-forbindelse")
+
 
 def release_conn(conn):
     try:
@@ -167,7 +174,7 @@ def init_db():
         release_conn(conn)
 
 # =====================
-# GENERIC LOADERS
+# GENERIC LOADERS (SIKRE)
 # =====================
 def _load_latest(table, default):
     conn = get_conn()
@@ -175,9 +182,10 @@ def _load_latest(table, default):
         cur = conn.cursor()
         cur.execute(f"SELECT data FROM {table} ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
-        return row[0] if row else default
+        return row[0] if row and row[0] else default
     finally:
         release_conn(conn)
+
 
 def _insert(table, data):
     conn = get_conn()
@@ -202,12 +210,13 @@ def load_sessions():
 
         cur.execute("SELECT data FROM sessions ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
-        data = row[0] if row else {"current": None, "sessions": {}}
 
+        data = row[0] if row and row[0] else {"current": None, "sessions": {}}
         data["current"] = current
         return data
     finally:
         release_conn(conn)
+
 
 def save_sessions(data):
     conn = get_conn()
@@ -227,26 +236,34 @@ def save_sessions(data):
     finally:
         release_conn(conn)
 
+
 def load_lager():
     return _load_latest("lager", {})
+
 
 def load_prices():
     return _load_latest("prices", {})
 
+
 def load_user_stats():
     return _load_latest("user_stats", {})
+
 
 def save_user_stats(stats):
     _insert("user_stats", stats)
 
+
 def reset_all_stats():
     _insert("user_stats", {})
+
 
 def load_access():
     return _load_latest("access", {"users": {}, "blocked": []})
 
+
 def save_access(data):
     _insert("access", data)
+
 
 def audit_log(action, admin, target):
     events = load_audit()
@@ -259,6 +276,7 @@ def audit_log(action, admin, target):
     })
 
     _insert("audit", events)
+
 
 def load_audit():
     return _load_latest("audit", [])
@@ -275,6 +293,7 @@ def new_order(user, items, user_id=None):
         "total": 0,
         "time": datetime.now().strftime("%d-%m-%Y %H:%M")
     }
+
 
 def calc_total(items, prices):
     return sum(items[i] * prices.get(i, 0) for i in items)
