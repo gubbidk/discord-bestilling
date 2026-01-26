@@ -6,15 +6,16 @@
     <link rel="stylesheet" href="/static/style.css">
     <style>
         .edit-box {
-            max-width: 600px;
+            max-width: 650px;
             margin: auto;
         }
 
         .item-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
+            display: grid;
+            grid-template-columns: 1fr 80px 120px 90px;
+            gap: 10px;
             align-items: center;
+            margin-bottom: 10px;
         }
 
         .item-row input {
@@ -25,7 +26,17 @@
 
         .price {
             opacity: 0.7;
+            text-align: right;
         }
+
+        .stock {
+            font-size: 0.9em;
+            text-align: right;
+        }
+
+        .stock.ok { color: #2ecc71; }
+        .stock.warning { color: #f1c40f; }
+        .stock.danger { color: #e74c3c; font-weight: bold; }
 
         .total {
             font-size: 1.4em;
@@ -42,8 +53,13 @@
 
     <form method="post" id="orderForm">
         {% for item, amount in order["items"].items() %}
+
+        {% set max_amount = lager.get(item, 0) %}
+        {% set level = "danger" if max_amount <= 0 else "warning" if max_amount < 5 else "ok" %}
+
         <div class="item-row">
             <span>{{ item }}</span>
+
             <input
                 type="number"
                 min="0"
@@ -53,7 +69,12 @@
                 onchange="updateTotal()"
                 onkeyup="updateTotal()"
             >
+
             <span class="price">{{ prices[item] }} kr</span>
+
+            <span class="stock {{ level }}">
+                📦 {{ max_amount }}
+            </span>
         </div>
         {% endfor %}
 
@@ -78,18 +99,19 @@ function updateTotal() {
     document.getElementById("totalPrice").innerText = total;
 }
 </script>
+
 <script>
 let lastHash = null;
 
 async function poll() {
-    const res = await fetch("/session_data/{{ session }}");
+    const res = await fetch("/session_data/{{ session_name }}");
     const data = await res.json();
     if (lastHash && lastHash !== data.hash) {
         location.reload();
     }
     lastHash = data.hash;
 }
-setInterval(poll, 2000);
+setInterval(poll, 5000);
 </script>
 
 </body>
