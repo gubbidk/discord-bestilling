@@ -633,19 +633,22 @@ def edit_own_order(session_name, order_id):
     if not order:
         return "Order not found", 404
 
-    # 🔐 EJERSKAB – KUN ORDRENS EGEN BRUGER
+    # 🔐 KUN EGEN ORDRE
     if order.get("user_id") != session["user"]["id"]:
         return "Du må kun se din egen ordre", 403
+
+    # 🔒 HVIS BETALT ELLER SESSION ER LUKKET → VIS SESSION
+    if order.get("paid") or order.get("delivered") or not session_data.get("open"):
+        return redirect(f"/session/{session_name}")
+
+    # =====================
+    # HERFRA ER ORDREN REDIGERBAR
+    # =====================
 
     prices = load_prices()
     lager = load_lager()
 
-    # 🔒 READ-ONLY hvis betalt eller leveret
-    readonly = order.get("paid") or order.get("delivered")
-
-    # =====================
     # 📦 BEREGN LAGERSTATUS FOR DENNE SESSION
-    # =====================
     used = {}
     for o in orders:
         for item, amount in o["items"].items():
@@ -657,12 +660,9 @@ def edit_own_order(session_name, order_id):
         remaining[item] = max(0, lager.get(item, 0) - used_by_others)
 
     # =====================
-    # POST → KUN HVIS IKKE LÅST
+    # POST → GEM ÆNDRINGER
     # =====================
     if request.method == "POST":
-        if readonly:
-            return "Ordren er låst og kan ikke ændres", 403
-
         before_items = order["items"].copy()
 
         used = {}
@@ -690,6 +690,21 @@ def edit_own_order(session_name, order_id):
         )
 
         return redirect(f"/session/{session_name}")
+
+    # =====================
+    # GET → VIS EDIT SIDE
+    # =====================
+    return render_template(
+        "edit_order.html",
+        order=order,
+        prices=prices,
+        lager=lager,
+        remaining=remaining,
+        session_name=session_name,
+        admin=False,
+        user=session["user"]
+    )
+
 
     # =====================
     # GET → VIS ORDRE (READ-ONLY ELLER REDIGERBAR)
