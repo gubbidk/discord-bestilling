@@ -635,14 +635,13 @@ def edit_own_order(session_name, order_id):
 
     # 🔐 EJERSKAB – KUN ORDRENS EGEN BRUGER
     if order.get("user_id") != session["user"]["id"]:
-        return "Du må kun redigere din egen ordre", 403
-
-    # 🔒 LÅS HVIS BETALT ELLER LEVERET
-    if order.get("paid") or order.get("delivered"):
-        return "Ordren er låst og kan ikke redigeres", 403
+        return "Du må kun se din egen ordre", 403
 
     prices = load_prices()
     lager = load_lager()
+
+    # 🔒 READ-ONLY hvis betalt eller leveret
+    readonly = order.get("paid") or order.get("delivered")
 
     # =====================
     # 📦 BEREGN LAGERSTATUS FOR DENNE SESSION
@@ -654,18 +653,18 @@ def edit_own_order(session_name, order_id):
 
     remaining = {}
     for item in lager:
-        # brugt af andre (ikke denne ordre)
         used_by_others = used.get(item, 0) - order["items"].get(item, 0)
         remaining[item] = max(0, lager.get(item, 0) - used_by_others)
 
     # =====================
-    # POST → GEM ÆNDRINGER
+    # POST → KUN HVIS IKKE LÅST
     # =====================
     if request.method == "POST":
-        before_items = order["items"].copy()
-        before_total = order["total"]
+        if readonly:
+            return "Ordren er låst og kan ikke ændres", 403
 
-        # 🔁 beregn brugt lager igen
+        before_items = order["items"].copy()
+
         used = {}
         for o in orders:
             for item, amount in o["items"].items():
@@ -674,10 +673,8 @@ def edit_own_order(session_name, order_id):
         total = 0
         for item in order["items"]:
             requested = int(request.form.get(item, 0))
-
             used_by_others = used.get(item, 0) - before_items.get(item, 0)
             max_allowed = max(0, lager.get(item, 0) - used_by_others)
-
             final_amount = min(requested, max_allowed)
 
             order["items"][item] = final_amount
@@ -695,18 +692,20 @@ def edit_own_order(session_name, order_id):
         return redirect(f"/session/{session_name}")
 
     # =====================
-    # GET → VIS FORM + LAGERSTATUS
+    # GET → VIS ORDRE (READ-ONLY ELLER REDIGERBAR)
     # =====================
     return render_template(
         "edit_order.html",
         order=order,
         prices=prices,
         lager=lager,
-        remaining=remaining,          # 👈 DET VIGTIGE
+        remaining=remaining,
+        readonly=readonly,        # 👈 NY
         session_name=session_name,
         admin=False,
         user=session["user"]
     )
+
 
 
 
@@ -889,9 +888,24 @@ def edit_order(session_name, order_id):
     prices = load_prices()
     lager = load_lager()
 
+    # =====================
+    # 📦 BEREGN LAGERSTATUS (SAMME LOGIK SOM USER)
+    # =====================
+    used = {}
+    for o in orders:
+        for item, amount in o["items"].items():
+            used[item] = used.get(item, 0) + amount
+
+    remaining = {}
+    for item in lager:
+        used_by_others = used.get(item, 0) - order["items"].get(item, 0)
+        remaining[item] = max(0, lager.get(item, 0) - used_by_others)
+
+    # =====================
+    # POST → ADMIN KAN ALTID REDIGERE
+    # =====================
     if request.method == "POST":
         before_items = order["items"].copy()
-        before_total = order["total"]
 
         used = {}
         for o in orders:
@@ -912,22 +926,28 @@ def edit_order(session_name, order_id):
         save_sessions(data)
 
         audit_log(
-            "edit_order",
+            "edit_order_admin",
             session["user"]["name"],
             f"{session_name}:{order_id}"
         )
 
         return redirect(f"/session/{session_name}")
 
+    # =====================
+    # GET → VIS FORM (ADMIN)
+    # =====================
     return render_template(
         "edit_order.html",
         order=order,
         prices=prices,
         lager=lager,
+        remaining=remaining,   # 👈 FIXET
+        readonly=False,        # admin er aldrig låst
         session_name=session_name,
         admin=True,
         user=session["user"]
     )
+
 
 # =====================
 # START
